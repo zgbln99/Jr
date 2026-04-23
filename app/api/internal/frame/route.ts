@@ -147,28 +147,45 @@ export async function POST(req: Request) {
 
     const sum = contributing.reduce((s, r) => s + (r.usedAmount as number), 0);
 
-    // Monotonic guard: the running total only goes up. OCR-induced drops
-    // are virtually always misreads — a missing digit ("6 123 456" read as
-    // "123 456"), OCR latching onto the goal line instead of the current
-    // total, or the widget overlay obscured mid-tick. Reject the insert
-    // instead of making the public counter visibly go backwards.
-    //
-    // We compare against the last row in counter_readings regardless of
-    // source so a manual admin override also sets a floor — the admin
-    // can still lower the counter by a second override if needed, but
-    // OCR alone cannot pull it down.
+    // Two-sided sanity guard against OCR misreads:
+    //   * Lower than the last stored value → a digit got dropped ("6 123 456"
+    //     read as "123 456"), or OCR latched onto a smaller number on screen.
+    //     Reject so the public counter never goes backwards.
+    //   * More than +50% over the last value in a single tick → a digit got
+    //     duplicated ("6 524 873" read as "65 248 730"), or OCR concatenated
+    //     two numbers. Without this cap, one bad tick locked an inflated
+    //     floor and every subsequent correct reading looked like a "drop"
+    //     and got rejected — the counter froze at a fake number.
+    // The cap doesn't kick in when the floor is very low (< 10 000 zł),
+    // so initial bootstraps from a near-zero state still go through.
     const latest = getLatestCounter();
-    if (latest && sum < latest.amount_pln) {
-      console.warn(
-        `[frame] rejecting decreasing sum: ${sum.toFixed(0)} < last ${latest.amount_pln.toFixed(0)}`,
-      );
-      return NextResponse.json({
-        saved: true,
-        ocr: "rejected — sum lower than last",
-        attempted: sum,
-        previousAmount: latest.amount_pln,
-        perRegion,
-      });
+    if (latest && latest.amount_pln >= 10_000) {
+      const ratio = sum / latest.amount_pln;
+      if (sum < latest.amount_pln) {
+        console.warn(
+          `[frame] rejecting decreasing sum: ${sum.toFixed(0)} < last ${latest.amount_pln.toFixed(0)}`,
+        );
+        return NextResponse.json({
+          saved: true,
+          ocr: "rejected — sum lower than last",
+          attempted: sum,
+          previousAmount: latest.amount_pln,
+          perRegion,
+        });
+      }
+      if (ratio > 1.5) {
+        console.warn(
+          `[frame] rejecting implausible spike: ${sum.toFixed(0)} > 1.5× last ${latest.amount_pln.toFixed(0)} (${(ratio * 100).toFixed(0)}%)`,
+        );
+        return NextResponse.json({
+          saved: true,
+          ocr: "rejected — implausible upward jump (likely OCR digit duplication)",
+          attempted: sum,
+          previousAmount: latest.amount_pln,
+          ratio,
+          perRegion,
+        });
+      }
     }
 
     const note =

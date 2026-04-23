@@ -202,6 +202,12 @@ let consecutiveFails = 0;
 
 async function ensureUrl(force) {
   const now = Date.now();
+  // Only force-refresh when the cached URL is actually past its signed
+  // expiry (with a 60 s safety margin). MANIFEST_REFRESH_MINUTES is now a
+  // hard ceiling, not a routine schedule — every yt-dlp call is one more
+  // chance for YouTube to flag the IP as a bot, so we'd rather ride the
+  // signed URL to its natural end and only refresh when ffmpeg actually
+  // starts failing.
   const cacheExpired = now > cachedExpiresAt - 60_000;
   if (!force && cachedUrl && !cacheExpired) return cachedUrl;
 
@@ -212,6 +218,9 @@ async function ensureUrl(force) {
   if (!ytdlpBin) ytdlpBin = await ensureYtDlp();
   const url = await resolveStreamUrl(ytdlpBin);
   cachedUrl = url;
+  // Trust the signed `expire=` query param when it's there — typically
+  // 4-6 hours from now. Cap with MANIFEST_REFRESH_MS only as a sanity
+  // ceiling so a freak 24h URL doesn't go stale silently.
   const signedExpiry = urlExpiresAt(url);
   const maxAgeExpiry = now + MANIFEST_REFRESH_MS;
   cachedExpiresAt = Math.min(signedExpiry ?? Infinity, maxAgeExpiry);
