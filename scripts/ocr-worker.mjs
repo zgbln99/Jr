@@ -32,12 +32,16 @@ const ENGINE = (process.env.OCR_ENGINE || "paddle").toLowerCase();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://127.0.0.1:3000";
 const INTERNAL_TOKEN = process.env.SESSION_SECRET;
 
-// Crop region = bottom-left of the frame where the two counters appear.
-// Values are fractions of width/height (0..1).
+// Crop region = the donation widget overlay on the left side of the frame.
+// The widget holds two counters we need:
+//   * a green "live ticker" amount at the top (e.g. "247 454 zł")
+//   * a red progress bar with the cumulative total (e.g. "5 851 146,29 zł")
+// Values are fractions of width/height (0..1). Defaults cover roughly the
+// left 55% width and lower 60% height — tune in .env if the overlay moves.
 const CROP_X = clamp01(Number(process.env.CROP_X ?? 0));
-const CROP_Y = clamp01(Number(process.env.CROP_Y ?? 0.6));
-const CROP_W = clamp01(Number(process.env.CROP_W ?? 0.45));
-const CROP_H = clamp01(Number(process.env.CROP_H ?? 0.4));
+const CROP_Y = clamp01(Number(process.env.CROP_Y ?? 0.4));
+const CROP_W = clamp01(Number(process.env.CROP_W ?? 0.55));
+const CROP_H = clamp01(Number(process.env.CROP_H ?? 0.6));
 
 function clamp01(n) {
   if (!Number.isFinite(n)) return 0;
@@ -69,13 +73,11 @@ async function tick() {
     const text = await runOcr(cropPath);
     console.log("[ocr] raw text:", text.replace(/\s+/g, " ").slice(0, 300));
 
-    const amounts = extractAmounts(text);
-    if (amounts.length === 0) {
+    const picked = pickCounterAmounts(text);
+    if (picked.length === 0) {
       console.warn("[ocr] no amounts parsed — skipping this tick");
       return;
     }
-    // We expect two counters; fall back to summing whatever we found.
-    const picked = amounts.slice(0, 2);
     const sum = picked.reduce((s, v) => s + v, 0);
     console.log(
       `[ocr] amounts=${picked.map((n) => n.toFixed(2)).join(" + ")} = ${sum.toFixed(2)} PLN`,
@@ -209,6 +211,9 @@ async function runTesseract(imgPath) {
 // Handles formats like:
 //   "6 123 456 zł", "6,123,456.00 PLN", "6.123.456", "6 123 456,78 zł"
 
+const MIN_COUNTER_PLN = Number(process.env.OCR_MIN_AMOUNT ?? 10_000);
+const MAX_COUNTER_PLN = Number(process.env.OCR_MAX_AMOUNT ?? 100_000_000);
+
 export function extractAmounts(text) {
   const results = [];
   // Match runs of digits that may include thousand separators (space, dot, comma)
@@ -229,6 +234,51 @@ export function extractAmounts(text) {
     }
   }
   return results;
+}
+
+// Find "goal" amounts in the widget. Pattern: "X zł z Y zł" — we want to
+// ignore Y (the target). Also accepts "z Y zł" on the same line without
+// the leading "zł", and variants like "do celu Y zł".
+export function extractGoals(text) {
+  const goals = new Set();
+  const patterns = [
+    /\bz\s+((?:\d[\d\s.,]{2,})(?:[.,]\d{1,2})?)\s*(?:zł|pln)/gi,
+    /celu?\s*:?\s*((?:\d[\d\s.,]{2,})(?:[.,]\d{1,2})?)\s*(?:zł|pln)/gi,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(text)) != null) {
+      const n = parseAmount(m[1]);
+      if (n != null) goals.add(n);
+    }
+  }
+  return goals;
+}
+
+// Pick the two counter amounts we actually want to sum:
+//   * drop amounts below OCR_MIN_AMOUNT (default 10 000 zł) — filters out the
+//     individual donation ticker ("Michał 20 zł")
+//   * drop amounts above OCR_MAX_AMOUNT (sanity check)
+//   * drop amounts identified as "goal" via extractGoals()
+//   * take the two largest unique remaining values
+export function pickCounterAmounts(text) {
+  const all = extractAmounts(text);
+  const goals = extractGoals(text);
+  const seen = new Set();
+  const candidates = [];
+  for (const n of all) {
+    if (n < MIN_COUNTER_PLN || n > MAX_COUNTER_PLN) continue;
+    if (goals.has(n)) continue;
+    // De-dup exact repeats (OCR often sees the same number twice)
+    const key = Math.round(n * 100);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(n);
+  }
+  // Two largest — keeps the "cumulative + live ticker" pair stable even if
+  // the ticker temporarily outgrows something weird.
+  candidates.sort((a, b) => b - a);
+  return candidates.slice(0, 2);
 }
 
 function parseAmount(raw) {
@@ -268,7 +318,13 @@ async function postToApi(sum, breakdown) {
 if (process.env.OCR_DRY_RUN === "1") {
   // Print parse of supplied fixture text then exit (useful in tests)
   const fixture = process.argv[2] ? readFileSync(process.argv[2], "utf8") : "";
-  console.log(JSON.stringify(extractAmounts(fixture)));
+  const all = extractAmounts(fixture);
+  const goals = [...extractGoals(fixture)];
+  const picked = pickCounterAmounts(fixture);
+  const sum = picked.reduce((s, v) => s + v, 0);
+  console.log(
+    JSON.stringify({ all, goals, picked, sum }, null, 2),
+  );
   process.exit(0);
 }
 

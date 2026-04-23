@@ -1,5 +1,6 @@
 import { Section } from "./Section";
 import type { Guest } from "@/lib/db";
+import { normalizePhotoUrl } from "@/lib/media";
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
@@ -13,6 +14,7 @@ function formatDate(iso: string | null): string | null {
 
 function GuestCard({ guest }: { guest: Guest }) {
   const dateLabel = formatDate(guest.appearance_date);
+  const photoUrl = normalizePhotoUrl(guest.photo_url);
   const instagramHref = guest.instagram
     ? guest.instagram.startsWith("http")
       ? guest.instagram
@@ -22,11 +24,11 @@ function GuestCard({ guest }: { guest: Guest }) {
   return (
     <article className="group rounded-[8px] border border-stripe-border bg-white overflow-hidden shadow-stripe-soft hover:shadow-stripe-elevated transition-shadow">
       <div className="aspect-[4/5] relative bg-gradient-to-br from-stripe-purple-soft to-stripe-magenta-light overflow-hidden">
-        {guest.photo_url ? (
+        {photoUrl ? (
           // Using native img for unknown remote hosts (admin-uploaded)
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={guest.photo_url}
+            src={photoUrl}
             alt={guest.name}
             loading="lazy"
             className="h-full w-full object-cover"

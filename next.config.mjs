@@ -7,6 +7,9 @@ const nextConfig = {
       { protocol: "https", hostname: "img.youtube.com" },
       { protocol: "https", hostname: "yt3.googleusercontent.com" },
       { protocol: "https", hostname: "yt3.ggpht.com" },
+      { protocol: "https", hostname: "www.dropbox.com" },
+      { protocol: "https", hostname: "dl.dropboxusercontent.com" },
+      { protocol: "https", hostname: "drive.google.com" },
     ],
   },
   experimental: {

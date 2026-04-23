@@ -110,20 +110,47 @@ Worker wymaga `yt-dlp`, `ffmpeg` i albo `paddleocr` (zalecane), albo `tesseract-
 
 ## Kalibracja OCR
 
-Dwa liczniki są w lewym dolnym rogu kadru. Domyślny crop (ustawiony w `scripts/ocr-worker.mjs` jako `CROP_X / CROP_Y / CROP_W / CROP_H` w `.env`) wycina:
+Widżet ze zrzutką na streamie ma dwa liczniki:
 
-- startuje na 0% szerokości, 60% wysokości,
-- bierze 45% szerokości, 40% wysokości.
+- zielony, u góry widżetu — live ticker (pokazuje aktualne wpłaty w trakcie
+  transmisji, np. `247 454 zł`),
+- czerwony pasek pod spodem — łączny stan zbiórki (np. `5 851 146,29 zł`),
+  za którym czasem pojawia się cel (np. `z 6 000 000,00 zł`).
 
-Jeśli OCR łapie nie to co trzeba:
+Worker sumuje te dwa liczniki. Parser (`pickCounterAmounts` w
+`scripts/ocr-worker.mjs`) automatycznie:
+
+- ignoruje kwoty niższe od `OCR_MIN_AMOUNT` (domyślnie 10 000 zł) — w ten
+  sposób wylatują pojedyncze wpłaty z ticker-listy ("Michał 20 zł"),
+- wykrywa cel zbiórki po wzorcu `X zł z Y zł` i **Y** ignoruje,
+- bierze dwie największe pozostałe kwoty.
+
+Domyślny crop (ustawiony w `scripts/ocr-worker.mjs` jako
+`CROP_X / CROP_Y / CROP_W / CROP_H`, do nadpisania przez `.env`) wycina lewą
+połowę kadru: X=0%, Y=40%, szerokość=55%, wysokość=60%. Jeśli widżet
+zmieni pozycję albo zmieni się layout streamu, zmień procenty w `.env`
+i `systemctl restart jrjr-ocr` — nic nie trzeba rekompilować.
+
+Szybki sanity-check parsera bez łączenia się ze streamem:
 
 ```bash
-# Zrzuć jedną klatkę lokalnie i obejrzyj crop:
-STREAM_URL=https://... node scripts/ocr-worker.mjs &
-# lub w .env wyreguluj procenty — 0 to górny-lewy, 1 to prawy-dolny.
+OCR_DRY_RUN=1 SESSION_SECRET=<dowolne-32-znaki> \
+  node scripts/ocr-worker.mjs path/to/widget-text.txt
 ```
 
-Jeśli w streamie zmienia się układ (np. overlay przesuwa się), zmień crop i zrestartuj worker — nic nie trzeba rekompilować.
+## Zdjęcia gości z Dropboxa
+
+W panelu admina w polu "Zdjęcie" można wkleić:
+
+- link raw z Dropboxa (`https://dl.dropboxusercontent.com/...`),
+- zwykły link udostępniony (`https://www.dropbox.com/.../photo.jpg?dl=0`) —
+  automatycznie zamienimy go na format raw przy wyświetlaniu,
+- link Google Drive (`/file/d/<id>/view`) — zostanie zamieniony na
+  `drive.google.com/uc?export=view&id=<id>`,
+- dowolny inny bezpośredni URL do pliku graficznego.
+
+W adminie pod polem wyświetla się podgląd miniatury — jeśli zamiast zdjęcia
+jest plama, link nie jest publiczny lub nie wskazuje bezpośrednio na obraz.
 
 ## Override ręczny
 

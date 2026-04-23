@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CounterReading, Guest } from "@/lib/db";
+import { normalizePhotoUrl } from "@/lib/media";
 
 type Props = {
   settings: Record<string, string>;
@@ -628,12 +629,31 @@ function GuestsTab({ initial }: { initial: Guest[] }) {
               <option value="past">Już był</option>
             </select>
           </Field>
-          <Field label="Zdjęcie — URL (opcjonalnie)">
+          <Field
+            label="Zdjęcie — URL (opcjonalnie)"
+            hint="Dropbox: wklej zwykły link do pliku (z '?dl=0') — sam zamienię na raw. Google Drive i bezpośrednie linki też działają."
+          >
             <Input
               value={draft.photo_url ?? ""}
               onChange={(e) => setDraft({ ...draft, photo_url: e.target.value })}
-              placeholder="https://..."
+              placeholder="https://www.dropbox.com/scl/fi/.../photo.jpg?dl=0"
             />
+            {draft.photo_url ? (
+              <div className="mt-2 flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={normalizePhotoUrl(draft.photo_url) ?? ""}
+                  alt="podgląd"
+                  className="h-16 w-16 rounded-[4px] object-cover border border-stripe-border bg-stripe-purple-soft"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.opacity = "0.2";
+                  }}
+                />
+                <span className="text-[11px] text-stripe-body break-all">
+                  {normalizePhotoUrl(draft.photo_url)}
+                </span>
+              </div>
+            ) : null}
           </Field>
           <Field label="Kolejność sortowania" hint="Mniejsza liczba = wyżej na liście">
             <Input
