@@ -74,8 +74,22 @@ function urlFor(strategy) {
 function parseCookiesTxt(content) {
   const out = [];
   for (const raw of content.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
+    let line = raw.trim();
+    if (!line) continue;
+
+    // Netscape format marks HttpOnly cookies with a `#HttpOnly_` prefix.
+    // Previous version skipped every line starting with `#` and silently
+    // dropped SID / __Secure-1PSID / HSID / SAPISID — the actual auth
+    // cookies. Without them YouTube treats us as a logged-out visitor
+    // even though we loaded a 24-cookie file.
+    let httpOnly = false;
+    if (line.startsWith("#HttpOnly_")) {
+      line = line.slice("#HttpOnly_".length);
+      httpOnly = true;
+    } else if (line.startsWith("#")) {
+      continue; // real comment line
+    }
+
     const parts = line.split("\t");
     if (parts.length < 7) continue;
     const [domain, , path, secure, expires, name, value] = parts;
@@ -85,7 +99,7 @@ function parseCookiesTxt(content) {
       domain,
       path: path || "/",
       secure: secure === "TRUE",
-      httpOnly: false,
+      httpOnly,
       sameSite: "Lax",
     };
     const exp = Number(expires);
@@ -158,7 +172,16 @@ try {
 
     if (cookiesPath && existsSync(cookiesPath)) {
       const cookies = parseCookiesTxt(readFileSync(cookiesPath, "utf8"));
-      if (cookies.length > 0) await context.addCookies(cookies);
+      if (cookies.length > 0) {
+        await context.addCookies(cookies);
+        const authNames = ["SID", "__Secure-1PSID", "__Secure-3PSID", "HSID", "SAPISID", "LOGIN_INFO"];
+        const haveAuth = authNames.filter((n) => cookies.some((c) => c.name === n));
+        console.log(
+          `[playwright] loaded ${cookies.length} cookies (auth found: ${
+            haveAuth.length ? haveAuth.join(", ") : "NONE — not logged in"
+          })`,
+        );
+      }
     }
 
     // Pre-accept the EU consent dialog by dropping a SOCS / CONSENT cookie
