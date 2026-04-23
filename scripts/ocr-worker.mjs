@@ -31,6 +31,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import Database from "better-sqlite3";
+import { scrapeDonationUrl } from "./scrapers.mjs";
 
 // -------- Config --------
 const STREAM_URL =
@@ -77,6 +78,23 @@ function loadEnabledRegions() {
   }
 }
 
+function loadDonationUrls() {
+  try {
+    const rows = db()
+      .prepare(
+        `SELECT key, value FROM settings
+         WHERE key IN ('donation_url_1','donation_url_2')
+         ORDER BY key ASC`,
+      )
+      .all();
+    return rows
+      .map((r) => (r.value || "").trim())
+      .filter((v) => /^https?:\/\//i.test(v));
+  } catch {
+    return [];
+  }
+}
+
 function clamp01(n) {
   if (!Number.isFinite(n)) return 0;
   return Math.min(1, Math.max(0, n));
@@ -103,6 +121,18 @@ const YT_EXTRA_ARGS = (process.env.YT_EXTRA_ARGS || "").split(" ").filter(Boolea
 // is 3.9–3.12.
 const PADDLE_PYTHON = process.env.PADDLE_PYTHON || "python3";
 
+// Where does the counter come from? Comma-separated list of sources, in
+// fallback order. Each tick tries the first source; if it returns no
+// amounts, we try the next.
+//   scrape  → fetch the donation URLs (Tipply/Siepomaga) and parse them
+//   ocr     → grab a frame from the YouTube stream and OCR the widget
+// Default is `scrape,ocr`: the scraper works reliably on public pages
+// without YouTube's anti-bot nonsense; OCR is a last-resort backup.
+const COUNTER_SOURCES = (process.env.COUNTER_SOURCES || "scrape,ocr")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 console.log(
   `[ocr] starting · engine=${ENGINE} · interval=${INTERVAL_MIN}min · stream=${STREAM_URL}`,
 );
@@ -110,6 +140,58 @@ console.log(
 // -------- Main loop --------
 
 async function tick() {
+  for (const source of COUNTER_SOURCES) {
+    try {
+      const result =
+        source === "scrape"
+          ? await tickScrape()
+          : source === "ocr"
+            ? await tickOcr()
+            : { amounts: [], note: `unknown source: ${source}` };
+      if (result.amounts.length > 0) {
+        const sum = result.amounts.reduce((s, v) => s + v, 0);
+        console.log(
+          `[${source}] amounts=${result.amounts.map((n) => n.toFixed(2)).join(" + ")} = ${sum.toFixed(2)} PLN`,
+        );
+        await postToApi(sum, result.amounts, result.note || source);
+        return;
+      }
+      console.warn(`[${source}] no amounts — trying next source`);
+    } catch (err) {
+      console.error(
+        `[${source}] failed: ${err instanceof Error ? err.message : err} — trying next source`,
+      );
+    }
+  }
+  console.warn("[tick] every source failed — keeping last known value");
+}
+
+// ---- Source 1: scrape donation pages ----
+
+async function tickScrape() {
+  const urls = loadDonationUrls();
+  if (urls.length === 0) {
+    return { amounts: [], note: "scrape: brak donation URLs w settings" };
+  }
+  /** @type {number[]} */
+  const amounts = [];
+  const notes = [];
+  for (const url of urls) {
+    try {
+      const { amount, hint } = await scrapeDonationUrl(url);
+      console.log(`[scrape] ${url} → ${amount.toFixed(2)} PLN (${hint})`);
+      amounts.push(amount);
+      notes.push(`${hint}=${amount.toFixed(0)}`);
+    } catch (err) {
+      console.warn(`[scrape] ${url} failed: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+  return { amounts, note: notes.join(" + ") };
+}
+
+// ---- Source 2: OCR the YouTube stream widget ----
+
+async function tickOcr() {
   const workDir = mkdtempSync(join(tmpdir(), "jrjr-ocr-"));
   try {
     const framePath = join(workDir, "frame.jpg");
@@ -162,11 +244,7 @@ async function tick() {
       allAmounts.push(...pickCounterAmounts(text));
     }
 
-    if (allAmounts.length === 0) {
-      console.warn("[ocr] no amounts parsed — skipping this tick");
-      return;
-    }
-    // De-dup exact repeats (OCR can read the same number twice across regions)
+    // De-dup exact repeats
     const seen = new Set();
     const picked = [];
     for (const n of allAmounts) {
@@ -175,14 +253,7 @@ async function tick() {
       seen.add(key);
       picked.push(n);
     }
-    const sum = picked.reduce((s, v) => s + v, 0);
-    console.log(
-      `[ocr] amounts=${picked.map((n) => n.toFixed(2)).join(" + ")} = ${sum.toFixed(2)} PLN`,
-    );
-
-    await postToApi(sum, picked);
-  } catch (err) {
-    console.error("[ocr] tick failed:", err instanceof Error ? err.message : err);
+    return { amounts: picked, note: "ocr" };
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
@@ -384,16 +455,18 @@ function parseAmount(raw) {
   return Number.isFinite(n) ? n : null;
 }
 
-async function postToApi(sum, breakdown) {
+async function postToApi(sum, breakdown, note) {
   const url = `${SITE_URL.replace(/\/$/, "")}/api/internal/ocr`;
-  const note = `OCR ${breakdown.map((n) => n.toFixed(0)).join(" + ")}`;
+  const payloadNote =
+    note ||
+    `${breakdown.map((n) => n.toFixed(0)).join(" + ")}`.slice(0, 500);
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-internal-token": INTERNAL_TOKEN,
     },
-    body: JSON.stringify({ amount: sum, note }),
+    body: JSON.stringify({ amount: sum, note: payloadNote }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
