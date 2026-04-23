@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { fireMilestoneConfetti, millionsCrossed } from "@/lib/confetti";
 
 type CounterData = {
   amount: number;
@@ -31,7 +32,6 @@ function splitAmount(n: number): { number: string; currency: string } {
     currency: "PLN",
     maximumFractionDigits: 0,
   }).format(n);
-  // Split "6 098 600 zł" → ["6 098 600", "zł"]
   const m = full.match(/^(.+?)\s*(zł|PLN)\s*$/i);
   if (m) return { number: m[1].trim(), currency: m[2] };
   return { number: full, currency: "" };
@@ -48,10 +48,12 @@ export function WidgetCounter({
   scale,
   label,
 }: WidgetProps) {
+  // Sit on the SSR-provided amount immediately. No 0→X wind-up — we
+  // only animate the delta between successive polls.
   const [displayed, setDisplayed] = useState<number>(initial.amount);
   const [pulse, setPulse] = useState(false);
   const rafRef = useRef<number | null>(null);
-  const fromRef = useRef<number>(0);
+  const fromRef = useRef<number>(initial.amount);
   const toRef = useRef<number>(initial.amount);
   const startedRef = useRef<number>(0);
 
@@ -64,12 +66,19 @@ export function WidgetCounter({
         const next = (await res.json()) as CounterData;
         if (cancelled) return;
         if (next.amount !== toRef.current) {
+          const prevAmount = toRef.current;
+          const crossed = millionsCrossed(prevAmount, next.amount);
+
           fromRef.current = displayed;
           toRef.current = next.amount;
           startedRef.current = performance.now();
           setPulse(true);
           window.setTimeout(() => setPulse(false), 1800);
           if (rafRef.current == null) animate();
+
+          if (crossed > 0) {
+            fireMilestoneConfetti().catch(() => {});
+          }
         }
       } catch {}
     }
@@ -94,14 +103,6 @@ export function WidgetCounter({
     rafRef.current = requestAnimationFrame(step);
   }
 
-  useEffect(() => {
-    fromRef.current = 0;
-    toRef.current = initial.amount;
-    startedRef.current = performance.now();
-    animate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const bgValue =
     bg === "chroma" ? "#00ff00" : bg === "dark" ? "#25282b" : "transparent";
 
@@ -112,15 +113,8 @@ export function WidgetCounter({
 
   const { number, currency } = splitAmount(Math.round(displayed));
 
-  // Drop shadow keeps the number readable over busy overlays. Applied by
-  // default even in dark/chroma modes so moving the widget between
-  // backgrounds doesn't look inconsistent. Override via ?shadow=none or
-  // ?shadow=soft when the streamer's design already has enough contrast.
   const numberShadow = SHADOWS[shadow];
-  // Label gets a softer variant so the dot + eyebrow don't compete with
-  // the main number visually.
   const labelShadow = shadow === "none" ? "none" : SHADOWS.soft;
-
   const pulseShadow = pulse
     ? `0 0 60px ${accentColor === "#e60000" ? "rgba(230,0,0,0.7)" : "rgba(255,255,255,0.5)"}`
     : "";

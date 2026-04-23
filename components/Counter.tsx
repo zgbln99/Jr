@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { fireMilestoneConfetti, millionsCrossed } from "@/lib/confetti";
 
 type CounterData = {
   amount: number;
@@ -27,17 +28,17 @@ function formatRelative(ts: number | null): string {
   return `${days} dni temu`;
 }
 
-// Polls /api/counter every 10 s so the headline number stays near-real-time
-// while Łatwogang is streaming. Animates whenever the backend reports a
-// different value.
 const POLL_MS = 10_000;
 
 export function Counter({ initial }: { initial: CounterData }) {
   const [data, setData] = useState<CounterData>(initial);
+  // Start the display sitting on the value that came from SSR — no
+  // pointless 0→X wind-up on first load. Animation kicks in only when the
+  // number actually changes between polls, and only animates the delta.
   const [displayed, setDisplayed] = useState<number>(initial.amount);
   const [bumped, setBumped] = useState(false);
   const rafRef = useRef<number | null>(null);
-  const fromRef = useRef<number>(0);
+  const fromRef = useRef<number>(initial.amount);
   const toRef = useRef<number>(initial.amount);
   const startedRef = useRef<number>(0);
 
@@ -50,12 +51,21 @@ export function Counter({ initial }: { initial: CounterData }) {
         const next = (await res.json()) as CounterData;
         if (cancelled) return;
         if (next.amount !== toRef.current) {
+          const prevAmount = toRef.current;
+          const crossed = millionsCrossed(prevAmount, next.amount);
+
           fromRef.current = displayed;
           toRef.current = next.amount;
           startedRef.current = performance.now();
           setBumped(true);
           window.setTimeout(() => setBumped(false), 1600);
           if (rafRef.current == null) animate();
+
+          if (crossed > 0) {
+            // Fire once per crossing — a single donation big enough to
+            // skip two millions at once still only triggers one burst.
+            fireMilestoneConfetti().catch(() => {});
+          }
         }
         setData(next);
       } catch {
@@ -83,22 +93,12 @@ export function Counter({ initial }: { initial: CounterData }) {
     rafRef.current = requestAnimationFrame(step);
   }
 
-  useEffect(() => {
-    fromRef.current = 0;
-    toRef.current = initial.amount;
-    startedRef.current = performance.now();
-    animate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const stale = data.updatedAt ? Date.now() - data.updatedAt > 10 * 60_000 : true;
 
   return (
     <div className="flex flex-col items-center">
       <div
-        className={`display tnum text-white text-center leading-none transition-[text-shadow] duration-500 ${
-          bumped ? "text-shadow-glow" : ""
-        }`}
+        className="display tnum text-white text-center leading-none transition-[text-shadow] duration-500"
         style={{
           fontSize: "clamp(3.5rem, 16vw, 11rem)",
           letterSpacing: "-0.04em",
