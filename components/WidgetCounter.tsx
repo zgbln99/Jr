@@ -142,22 +142,23 @@ export function WidgetCounter({
       >
         <div className="flex flex-col items-center gap-3 md:gap-4">
           {label ? (
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <span
                 className="inline-block rounded-full animate-pulse"
                 style={{
-                  width: `${0.55 * scale}rem`,
-                  height: `${0.55 * scale}rem`,
+                  width: `${0.9 * scale}rem`,
+                  height: `${0.9 * scale}rem`,
                   background: accentColor,
                 }}
                 aria-hidden
               />
               <p
-                className="uppercase tracking-[0.16em] font-bold"
+                className="uppercase font-bold"
                 style={{
                   color: textColor,
-                  opacity: 0.85,
-                  fontSize: `${0.82 * scale}rem`,
+                  opacity: 0.9,
+                  fontSize: `clamp(${1 * scale}rem, ${2.2 * scale}vw, ${1.9 * scale}rem)`,
+                  letterSpacing: "0.12em",
                   textShadow: labelShadow,
                 }}
               >
