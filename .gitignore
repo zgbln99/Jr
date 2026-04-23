@@ -10,5 +10,15 @@ data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
+data/last-frame.jpg
 .cache
 coverage
+
+# SECRETS — NEVER COMMIT THESE
+# YouTube session cookies = active Google account session. Treat like a
+# password. Keep them on the VPS only, behind chmod 600.
+cookies.txt
+youtube-cookies.txt
+youtube.txt
+.cookies/
+*.cookies
