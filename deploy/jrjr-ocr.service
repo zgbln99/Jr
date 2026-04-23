@@ -1,0 +1,23 @@
+[Unit]
+Description=jrjr.pl - OCR worker
+After=network.target jrjr-web.service
+Wants=jrjr-web.service
+
+[Service]
+Type=simple
+User=jrjr
+Group=jrjr
+WorkingDirectory=/var/www/jrjr
+EnvironmentFile=/var/www/jrjr/.env
+ExecStart=/usr/bin/node scripts/ocr-worker.mjs
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

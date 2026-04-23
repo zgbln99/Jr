@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #ffffff;
+  --color-heading: #061b31;
+  --color-body: #64748d;
+  --color-label: #273951;
+  --color-border: #e5edf5;
+  --color-purple: #533afd;
+  --color-purple-hover: #4434d4;
+  --color-brand-dark: #1c1e54;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-heading);
+  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-weight: 300;
+  line-height: 1.4;
+}
+
+.tnum {
+  font-feature-settings: "tnum", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+/* Selection */
+::selection {
+  background: #b9b9f9;
+  color: #1c1e54;
+}
+
+/* Focus ring per DESIGN-stripe.md */
+:focus-visible {
+  outline: 2px solid #533afd;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Sticky nav backdrop */
+.nav-blur {
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+
+/* Ruby/magenta gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #ea2261 0%, #f96bee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Section heading defaults */
+h1, h2, h3, h4 {
+  color: var(--color-heading);
+  font-weight: 300;
+  letter-spacing: -0.01em;
+}
+
+/* Smooth counter transitions */
+.counter-digit {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hero gradient bottom fade into white */
+.hero-fade {
+  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+}

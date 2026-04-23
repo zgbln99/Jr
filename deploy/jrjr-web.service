@@ -1,0 +1,23 @@
+[Unit]
+Description=jrjr.pl - Next.js web server
+After=network.target
+
+[Service]
+Type=simple
+User=jrjr
+Group=jrjr
+WorkingDirectory=/var/www/jrjr
+EnvironmentFile=/var/www/jrjr/.env
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

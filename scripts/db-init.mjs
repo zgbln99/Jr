@@ -1,0 +1,55 @@
+#!/usr/bin/env node
+// Initializes / migrates the SQLite database by importing the app's db module.
+// Handy as a one-shot after cloning on a fresh VPS.
+
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
+// Require the compiled or TS file — for raw run we shell out to a tiny Node shim:
+// simpler approach: just open the DB through better-sqlite3 directly using the
+// same schema as lib/db.ts. Keeps this script dependency-free at runtime.
+
+import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
+const DB_PATH = resolve(process.cwd(), process.env.DATABASE_PATH || "./data/jrjr.db");
+mkdirSync(dirname(DB_PATH), { recursive: true });
+
+const db = new Database(DB_PATH);
+db.pragma("journal_mode = WAL");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS counter_readings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    amount_pln REAL NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('ocr','manual')),
+    note TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_counter_readings_created_at
+    ON counter_readings (created_at DESC);
+  CREATE TABLE IF NOT EXISTS guests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    handle TEXT,
+    instagram TEXT,
+    appearance_date TEXT,
+    status TEXT NOT NULL DEFAULT 'past' CHECK(status IN ('past','upcoming')),
+    photo_url TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_guests_status_sort
+    ON guests (status, sort_order, appearance_date);
+`);
+
+console.log(`[db] initialized at ${DB_PATH}`);
+db.close();
+
+void require;

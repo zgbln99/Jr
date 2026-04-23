@@ -1,0 +1,248 @@
+import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __jrjrDb: Database.Database | undefined;
+}
+
+const DB_PATH = resolve(process.cwd(), process.env.DATABASE_PATH || "./data/jrjr.db");
+
+function openDb(): Database.Database {
+  mkdirSync(dirname(DB_PATH), { recursive: true });
+  const db = new Database(DB_PATH);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  migrate(db);
+  return db;
+}
+
+function migrate(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS counter_readings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      amount_pln REAL NOT NULL,
+      source TEXT NOT NULL CHECK(source IN ('ocr','manual')),
+      note TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_counter_readings_created_at
+      ON counter_readings (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS guests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      handle TEXT,
+      instagram TEXT,
+      appearance_date TEXT,
+      status TEXT NOT NULL DEFAULT 'past' CHECK(status IN ('past','upcoming')),
+      photo_url TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_guests_status_sort
+      ON guests (status, sort_order, appearance_date);
+  `);
+
+  const seedSetting = db.prepare(`
+    INSERT OR IGNORE INTO settings (key, value, updated_at)
+    VALUES (?, ?, ?)
+  `);
+
+  const now = Date.now();
+  const defaults: Record<string, string> = {
+    donation_url_1: "",
+    donation_url_2: "",
+    donation_label_1: "Zrzutka 1",
+    donation_label_2: "Zrzutka 2",
+    stream_end_iso: "",
+    about_text:
+      "Łatwogang postanowił zrobić coś, czego nikt jeszcze nie robił — przez dziewięć dni non-stop słuchać na streamie jednego utworu: Mai i Bedoesa. Pomysł wziął się z TikToka, gdzie każde polubienie miało oznaczać sekundę transmisji. Sekund nazbierało się tyle, że wyszło równe dziewięć dni. Zamiast odpuścić, Łatwogang zamienił to w akcję charytatywną na rzecz dzieci chorych na raka.",
+    initiators_text:
+      "Inicjatorami akcji są Łatwogang i Bedoes. Do transmisji dołączają kolejni influencerzy — golą głowy w geście solidarności z pacjentami onkologicznymi, robią sobie tatuaże, licytują przedmioty. Widzowie zachęcani są do wpłat na rzecz Fundacji Cancer Fighters.",
+    foundation_text:
+      "Fundacja Cancer Fighters od lat wspiera dzieci chore na nowotwory oraz ich rodziny. Środki zebrane podczas transmisji trafiają bezpośrednio na konto fundacji i finansują leczenie, rehabilitację oraz codzienne potrzeby podopiecznych.",
+    foundation_url: "https://cancerfighters.pl",
+    latwogang_ig: "",
+    bedoes_ig: "",
+    cancerfighters_ig: "",
+  };
+
+  for (const [k, v] of Object.entries(defaults)) {
+    seedSetting.run(k, v, now);
+  }
+}
+
+export function getDb(): Database.Database {
+  if (!globalThis.__jrjrDb) {
+    globalThis.__jrjrDb = openDb();
+  }
+  return globalThis.__jrjrDb;
+}
+
+// ---- Settings ----
+
+export function getSetting(key: string): string {
+  const row = getDb()
+    .prepare<string>("SELECT value FROM settings WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  return row?.value ?? "";
+}
+
+export function getAllSettings(): Record<string, string> {
+  const rows = getDb()
+    .prepare("SELECT key, value FROM settings")
+    .all() as Array<{ key: string; value: string }>;
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+
+export function setSetting(key: string, value: string) {
+  getDb()
+    .prepare(
+      `INSERT INTO settings (key, value, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    )
+    .run(key, value, Date.now());
+}
+
+// ---- Counter ----
+
+export type CounterReading = {
+  id: number;
+  amount_pln: number;
+  source: "ocr" | "manual";
+  note: string | null;
+  created_at: number;
+};
+
+export function insertCounter(
+  amount: number,
+  source: "ocr" | "manual",
+  note?: string,
+): CounterReading {
+  const stmt = getDb().prepare(
+    `INSERT INTO counter_readings (amount_pln, source, note, created_at)
+     VALUES (?, ?, ?, ?)`,
+  );
+  const created_at = Date.now();
+  const info = stmt.run(amount, source, note ?? null, created_at);
+  return {
+    id: Number(info.lastInsertRowid),
+    amount_pln: amount,
+    source,
+    note: note ?? null,
+    created_at,
+  };
+}
+
+export function getLatestCounter(): CounterReading | null {
+  const row = getDb()
+    .prepare(
+      `SELECT id, amount_pln, source, note, created_at
+       FROM counter_readings
+       ORDER BY created_at DESC
+       LIMIT 1`,
+    )
+    .get() as CounterReading | undefined;
+  return row ?? null;
+}
+
+export function getLatestOcrCounter(): CounterReading | null {
+  const row = getDb()
+    .prepare(
+      `SELECT id, amount_pln, source, note, created_at
+       FROM counter_readings
+       WHERE source = 'ocr'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+    )
+    .get() as CounterReading | undefined;
+  return row ?? null;
+}
+
+// ---- Guests ----
+
+export type Guest = {
+  id: number;
+  name: string;
+  handle: string | null;
+  instagram: string | null;
+  appearance_date: string | null;
+  status: "past" | "upcoming";
+  photo_url: string | null;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export function listGuests(): Guest[] {
+  return getDb()
+    .prepare(
+      `SELECT * FROM guests
+       ORDER BY
+         CASE status WHEN 'upcoming' THEN 0 ELSE 1 END,
+         sort_order ASC,
+         COALESCE(appearance_date, '9999') ASC,
+         id ASC`,
+    )
+    .all() as Guest[];
+}
+
+export function createGuest(input: Omit<Guest, "id" | "created_at" | "updated_at">): Guest {
+  const now = Date.now();
+  const info = getDb()
+    .prepare(
+      `INSERT INTO guests (name, handle, instagram, appearance_date, status, photo_url, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      input.name,
+      input.handle,
+      input.instagram,
+      input.appearance_date,
+      input.status,
+      input.photo_url,
+      input.sort_order,
+      now,
+      now,
+    );
+  return { id: Number(info.lastInsertRowid), ...input, created_at: now, updated_at: now };
+}
+
+export function updateGuest(id: number, patch: Partial<Omit<Guest, "id" | "created_at">>) {
+  const current = getDb().prepare("SELECT * FROM guests WHERE id = ?").get(id) as Guest | undefined;
+  if (!current) return null;
+  const next: Guest = { ...current, ...patch, updated_at: Date.now() };
+  getDb()
+    .prepare(
+      `UPDATE guests SET name = ?, handle = ?, instagram = ?, appearance_date = ?, status = ?, photo_url = ?, sort_order = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .run(
+      next.name,
+      next.handle,
+      next.instagram,
+      next.appearance_date,
+      next.status,
+      next.photo_url,
+      next.sort_order,
+      next.updated_at,
+      id,
+    );
+  return next;
+}
+
+export function deleteGuest(id: number) {
+  getDb().prepare("DELETE FROM guests WHERE id = ?").run(id);
+}
