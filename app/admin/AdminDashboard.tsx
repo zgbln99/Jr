@@ -2,15 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CounterReading, OcrRegion } from "@/lib/db";
+import type { CounterReading, OcrRegion, PageView, StatsBucket } from "@/lib/db";
 import { formatWarsawLabel } from "@/lib/time";
 import { OcrCalibration } from "@/components/OcrCalibration";
+
+type Stats = {
+  today: StatsBucket;
+  week: StatsBucket;
+  allTime: StatsBucket;
+  byPath: Array<{ path: string; views: number; uniques: number }>;
+  referrers: Array<{ referrer: string; views: number }>;
+  timeline: Array<{ hourBucket: number; views: number; uniques: number }>;
+  recent: PageView[];
+};
 
 type Props = {
   settings: Record<string, string>;
   regions: OcrRegion[];
   latest: CounterReading | null;
   latestOcr: CounterReading | null;
+  stats: Stats;
 };
 
 function formatPLN(n: number): string {
@@ -29,9 +40,9 @@ function formatDateTime(ts: number | null | undefined): string {
   }).format(new Date(ts));
 }
 
-export function AdminDashboard({ settings, regions, latest, latestOcr }: Props) {
+export function AdminDashboard({ settings, regions, latest, latestOcr, stats }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"counter" | "links" | "ocr">("counter");
+  const [tab, setTab] = useState<"counter" | "links" | "ocr" | "stats">("counter");
 
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -82,6 +93,7 @@ export function AdminDashboard({ settings, regions, latest, latestOcr }: Props) 
               ["counter", "Licznik"],
               ["ocr", "Kalibracja OCR"],
               ["links", "Linki i countdown"],
+              ["stats", "Statystyki"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -103,9 +115,206 @@ export function AdminDashboard({ settings, regions, latest, latestOcr }: Props) 
         ) : null}
         {tab === "links" ? <LinksTab settings={settings} /> : null}
         {tab === "ocr" ? <OcrCalibration initial={regions} /> : null}
+        {tab === "stats" ? <StatsTab stats={stats} /> : null}
       </div>
     </div>
   );
+}
+
+// ---------------- Stats tab ----------------
+
+function StatsTab({ stats }: { stats: Stats }) {
+  const { today, week, allTime, byPath, referrers, timeline, recent } = stats;
+
+  // Fill in hours with zero buckets so the timeline bar chart shows a
+  // continuous last-24h strip instead of gaps.
+  const nowHour = Math.floor(Date.now() / 3600_000);
+  const filledTimeline: { hourBucket: number; views: number; uniques: number }[] = [];
+  const timelineMap = new Map(timeline.map((r) => [r.hourBucket, r]));
+  for (let h = nowHour - 23; h <= nowHour; h++) {
+    filledTimeline.push(
+      timelineMap.get(h) ?? { hourBucket: h, views: 0, uniques: 0 },
+    );
+  }
+  const maxViews = Math.max(1, ...filledTimeline.map((b) => b.views));
+
+  const maxPathViews = Math.max(1, ...byPath.map((p) => p.views));
+  const maxRefViews = Math.max(1, ...referrers.map((r) => r.views));
+
+  return (
+    <>
+      <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <Kpi title="Dziś" bucket={today} />
+        <Kpi title="Ostatnie 7 dni" bucket={week} />
+        <Kpi title="Wszystko" bucket={allTime} />
+      </div>
+
+      <Card title="Ostatnie 24 godziny" description="Wyświetlenia / unikalni odwiedzający na godzinę.">
+        <div className="flex items-end gap-[2px] h-40">
+          {filledTimeline.map((b) => {
+            const h = (b.views / maxViews) * 100;
+            const d = new Date(b.hourBucket * 3600_000);
+            return (
+              <div
+                key={b.hourBucket}
+                className="flex-1 bg-vf-red/80 hover:bg-vf-red relative group"
+                style={{ height: `${Math.max(h, 2)}%` }}
+                title={`${d.getHours()}:00 · ${b.views} wyśw. · ${b.uniques} uniques`}
+              />
+            );
+          })}
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[11px] text-vf-body tnum">
+          <span>{formatHour(filledTimeline[0].hourBucket)}</span>
+          <span>{formatHour(filledTimeline[filledTimeline.length - 1].hourBucket)}</span>
+        </div>
+      </Card>
+
+      <Card
+        title="Strony (ostatnie 7 dni)"
+        description="Który URL dostał najwięcej ruchu. Widget OBS-owy pollowany co 10 s mocno dominuje — nie sugeruj się tą liczbą jako 'widzowie'."
+      >
+        {byPath.length === 0 ? (
+          <p className="text-vf-body text-[13px]">Brak danych.</p>
+        ) : (
+          <ul className="space-y-2">
+            {byPath.map((row) => (
+              <li key={row.path}>
+                <div className="flex items-baseline justify-between gap-4 mb-1 text-[13px]">
+                  <code className="font-mono text-vf-charcoal truncate">{row.path}</code>
+                  <span className="tnum text-vf-body">
+                    {row.views.toLocaleString("pl-PL")} wyśw. ·{" "}
+                    <strong className="text-vf-charcoal">
+                      {row.uniques.toLocaleString("pl-PL")}
+                    </strong>{" "}
+                    uniques
+                  </span>
+                </div>
+                <div className="h-2 rounded-[2px] bg-vf-neutral overflow-hidden">
+                  <div
+                    className="h-full bg-vf-red"
+                    style={{ width: `${(row.views / maxPathViews) * 100}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card title="Skąd wchodzą (ostatnie 7 dni)">
+        {referrers.length === 0 ? (
+          <p className="text-vf-body text-[13px]">Brak danych.</p>
+        ) : (
+          <ul className="space-y-2">
+            {referrers.map((row) => (
+              <li key={row.referrer}>
+                <div className="flex items-baseline justify-between gap-4 mb-1 text-[13px]">
+                  <span className="truncate text-vf-charcoal">{row.referrer}</span>
+                  <span className="tnum text-vf-body">
+                    {row.views.toLocaleString("pl-PL")} wyśw.
+                  </span>
+                </div>
+                <div className="h-2 rounded-[2px] bg-vf-neutral overflow-hidden">
+                  <div
+                    className="h-full bg-vf-red/70"
+                    style={{ width: `${(row.views / maxRefViews) * 100}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card title="Ostatnie odwiedziny">
+        {recent.length === 0 ? (
+          <p className="text-vf-body text-[13px]">Brak.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left text-vf-form border-b border-black/10">
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Kiedy</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Ścieżka</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Skąd</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Urządzenie</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((r) => (
+                  <tr key={r.id} className="border-b border-black/5">
+                    <td className="py-2 pr-3 tnum text-vf-body whitespace-nowrap">
+                      {formatRelative(r.ts)}
+                    </td>
+                    <td className="py-2 pr-3 font-mono text-vf-charcoal truncate max-w-[200px]">
+                      {r.path}
+                    </td>
+                    <td className="py-2 pr-3 text-vf-body truncate max-w-[240px]">
+                      {r.referrer || "—"}
+                    </td>
+                    <td className="py-2 pr-3 text-vf-body truncate max-w-[260px]">
+                      {shortUA(r.user_agent)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function Kpi({ title, bucket }: { title: string; bucket: StatsBucket }) {
+  return (
+    <div className="bg-white rounded-[6px] border border-black/5 p-5">
+      <p className="eyebrow text-vf-red">{title}</p>
+      <p className="mt-2 tnum text-vf-charcoal text-[36px] font-bold leading-none">
+        {bucket.total.toLocaleString("pl-PL")}
+      </p>
+      <p className="mt-1 text-[12px] text-vf-body">
+        <span className="tnum">{bucket.uniques.toLocaleString("pl-PL")}</span>{" "}
+        unikalnych
+      </p>
+    </div>
+  );
+}
+
+function formatHour(hourBucket: number): string {
+  const d = new Date(hourBucket * 3600_000);
+  return d.toLocaleTimeString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatRelative(ts: number): string {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return `${s} s temu`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min temu`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} godz. temu`;
+  const d = Math.floor(h / 24);
+  return `${d} dni temu`;
+}
+
+function shortUA(ua: string | null): string {
+  if (!ua) return "—";
+  // Grab the distinctive engine / app part so the table isn't full of
+  // full 200-char user-agent strings.
+  const m =
+    ua.match(/OBS\/[\d.]+/) ||
+    ua.match(/Edg\/[\d.]+/) ||
+    ua.match(/Chrome\/[\d.]+/) ||
+    ua.match(/Firefox\/[\d.]+/) ||
+    ua.match(/Safari\/[\d.]+/);
+  const engine = m ? m[0] : ua.slice(0, 40);
+  const mobile = /Mobile|Android|iPhone/.test(ua) ? " · mobile" : "";
+  return engine + mobile;
 }
 
 function Card({

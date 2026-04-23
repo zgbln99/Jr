@@ -88,6 +88,22 @@ for (const ddl of [
   }
 }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS page_views (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL,
+    referrer TEXT,
+    user_agent TEXT,
+    ip_hash TEXT,
+    ts INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_page_views_ts ON page_views (ts DESC);
+  CREATE INDEX IF NOT EXISTS idx_page_views_path_ts
+    ON page_views (path, ts DESC);
+  CREATE INDEX IF NOT EXISTS idx_page_views_iphash_ts
+    ON page_views (ip_hash, ts DESC);
+`);
+
 console.log(`[db] initialized at ${DB_PATH}`);
 db.close();
 

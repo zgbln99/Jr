@@ -1,4 +1,5 @@
 import { getAllSettings, getLatestCounter } from "@/lib/db";
+import { logPageView } from "@/lib/analytics";
 import { Hero } from "@/components/Hero";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ function extractYoutubeId(url: string): string | null {
 }
 
 export default function Home() {
+  logPageView("/");
   const settings = getAllSettings();
   const counterRow = getLatestCounter();
 

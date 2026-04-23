@@ -98,6 +98,25 @@ function migrate(db: Database.Database) {
     }
   }
 
+  // Lightweight first-party analytics. One row per public-page SSR
+  // render. IP is hashed with a per-day salt so "uniques per day" makes
+  // sense without persisting raw IPs.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS page_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      path TEXT NOT NULL,
+      referrer TEXT,
+      user_agent TEXT,
+      ip_hash TEXT,
+      ts INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_page_views_ts ON page_views (ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_page_views_path_ts
+      ON page_views (path, ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_page_views_iphash_ts
+      ON page_views (ip_hash, ts DESC);
+  `);
+
   const seedSetting = db.prepare(`
     INSERT OR IGNORE INTO settings (key, value, updated_at)
     VALUES (?, ?, ?)
@@ -490,4 +509,108 @@ export function setRegionLastAmount(id: number, amount: number) {
       `UPDATE ocr_regions SET last_amount = ?, last_parsed_at = ? WHERE id = ?`,
     )
     .run(amount, Date.now(), id);
+}
+
+// ---- Analytics ----
+
+export type PageView = {
+  id: number;
+  path: string;
+  referrer: string | null;
+  user_agent: string | null;
+  ip_hash: string | null;
+  ts: number;
+};
+
+export function insertPageView(row: {
+  path: string;
+  referrer: string | null;
+  userAgent: string | null;
+  ipHash: string | null;
+}) {
+  getDb()
+    .prepare(
+      `INSERT INTO page_views (path, referrer, user_agent, ip_hash, ts)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(row.path, row.referrer, row.userAgent, row.ipHash, Date.now());
+}
+
+export type StatsBucket = { total: number; uniques: number };
+
+export function statsSince(sinceMs: number, path?: string): StatsBucket {
+  const where = path
+    ? `WHERE ts >= ? AND path = ?`
+    : `WHERE ts >= ?`;
+  const args: Array<number | string> = path ? [sinceMs, path] : [sinceMs];
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS total, COUNT(DISTINCT ip_hash) AS uniques
+       FROM page_views ${where}`,
+    )
+    .get(...args) as { total: number; uniques: number };
+  return { total: row.total, uniques: row.uniques };
+}
+
+export function pathBreakdown(
+  sinceMs: number,
+  limit = 20,
+): Array<{ path: string; views: number; uniques: number }> {
+  return getDb()
+    .prepare(
+      `SELECT path,
+              COUNT(*) AS views,
+              COUNT(DISTINCT ip_hash) AS uniques
+       FROM page_views
+       WHERE ts >= ?
+       GROUP BY path
+       ORDER BY views DESC
+       LIMIT ?`,
+    )
+    .all(sinceMs, limit) as Array<{ path: string; views: number; uniques: number }>;
+}
+
+export function topReferrers(
+  sinceMs: number,
+  limit = 10,
+): Array<{ referrer: string; views: number }> {
+  return getDb()
+    .prepare(
+      `SELECT COALESCE(NULLIF(referrer, ''), '(bezpośrednio)') AS referrer,
+              COUNT(*) AS views
+       FROM page_views
+       WHERE ts >= ?
+       GROUP BY referrer
+       ORDER BY views DESC
+       LIMIT ?`,
+    )
+    .all(sinceMs, limit) as Array<{ referrer: string; views: number }>;
+}
+
+export function hourlyTimeline(
+  hoursBack: number,
+): Array<{ hourBucket: number; views: number; uniques: number }> {
+  const sinceMs = Date.now() - hoursBack * 3600_000;
+  return getDb()
+    .prepare(
+      `SELECT (ts / 3600000) AS hourBucket,
+              COUNT(*) AS views,
+              COUNT(DISTINCT ip_hash) AS uniques
+       FROM page_views
+       WHERE ts >= ?
+       GROUP BY hourBucket
+       ORDER BY hourBucket ASC`,
+    )
+    .all(sinceMs) as Array<{ hourBucket: number; views: number; uniques: number }>;
+}
+
+export function recentPageViews(limit = 30): PageView[] {
+  return getDb()
+    .prepare(
+      `SELECT id, path, referrer, user_agent, ip_hash, ts
+       FROM page_views
+       ORDER BY ts DESC
+       LIMIT ?`,
+    )
+    .all(limit) as PageView[];
 }

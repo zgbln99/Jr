@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { logPageView } from "@/lib/analytics";
 import { WidgetGenerator } from "@/components/WidgetGenerator";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default function WidgetGeneratorPage() {
+  logPageView("/widget/generator");
   // Build the absolute URL using the request's Host header so the copy-
   // button value matches the domain the admin is actually visiting
   // (http://<ip>:8010 during setup, https://jrjr.pl in production).

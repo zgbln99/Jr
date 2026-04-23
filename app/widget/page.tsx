@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getLatestCounter } from "@/lib/db";
+import { logPageView } from "@/lib/analytics";
 import { WidgetCounter } from "@/components/WidgetCounter";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export default function WidgetPage({
 }: {
   searchParams: SearchParams;
 }) {
+  logPageView("/widget");
   const row = getLatestCounter();
   const counter = {
     amount: row?.amount_pln ?? 0,
