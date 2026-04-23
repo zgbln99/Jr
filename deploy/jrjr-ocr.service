@@ -12,8 +12,9 @@ EnvironmentFile=/var/www/jrjr/.env
 ExecStart=/usr/bin/node scripts/ocr-worker.mjs
 Restart=always
 RestartSec=15
-# OCR worker spikes RAM when Paddle runs. On Mikrus stick to Tesseract.
-MemoryMax=384M
+# OCR worker spikes RAM when Paddle runs. 1 GiB cap fits a comfortable
+# Paddle session; if you stick to Tesseract you can lower to 384M.
+MemoryMax=1G
 StandardOutput=journal
 StandardError=journal
 NoNewPrivileges=true

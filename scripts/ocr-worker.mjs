@@ -63,6 +63,12 @@ if (!INTERNAL_TOKEN || INTERNAL_TOKEN.length < 32) {
 const YT_COOKIES = process.env.YT_COOKIES;
 const YT_EXTRA_ARGS = (process.env.YT_EXTRA_ARGS || "").split(" ").filter(Boolean);
 
+// PaddleOCR refuses to run on Python 3.13 (no wheels yet). On Ubuntu 25.04
+// we install a side-by-side 3.12 in a venv and point this at it. Defaults
+// to whatever `python3` resolves to, which only works if the system python
+// is 3.9–3.12.
+const PADDLE_PYTHON = process.env.PADDLE_PYTHON || "python3";
+
 console.log(
   `[ocr] starting · engine=${ENGINE} · interval=${INTERVAL_MIN}min · stream=${STREAM_URL}`,
 );
@@ -187,7 +193,7 @@ for line in result or []:
         if txt: out.append(txt)
 print(json.dumps(out, ensure_ascii=False))
 `.trim();
-  const { stdout } = await run("python3", ["-c", script, imgPath]);
+  const { stdout } = await run(PADDLE_PYTHON, ["-c", script, imgPath]);
   const lines = JSON.parse(stdout.trim() || "[]");
   return lines.join("\n");
 }
