@@ -61,11 +61,12 @@ function migrate(db: Database.Database) {
 
   const now = Date.now();
   const defaults: Record<string, string> = {
-    donation_url_1: "",
-    donation_url_2: "",
-    donation_label_1: "Zrzutka 1",
-    donation_label_2: "Zrzutka 2",
-    stream_end_iso: "",
+    donation_url_1: "https://tipply.pl/@latwogang",
+    donation_url_2: "https://www.siepomaga.pl/latwogang",
+    donation_label_1: "Tipply",
+    donation_label_2: "Siepomaga",
+    // Stream ends Sunday 26 April 2026, 16:00 Europe/Warsaw.
+    stream_end_iso: "2026-04-26T16:00",
     about_text:
       "Łatwogang postanowił zrobić coś, czego nikt jeszcze nie robił — przez dziewięć dni non-stop słuchać na streamie jednego utworu: Mai i Bedoesa. Pomysł wziął się z TikToka, gdzie każde polubienie miało oznaczać sekundę transmisji. Sekund nazbierało się tyle, że wyszło równe dziewięć dni. Zamiast odpuścić, Łatwogang zamienił to w akcję charytatywną na rzecz dzieci chorych na raka.",
     initiators_text:
