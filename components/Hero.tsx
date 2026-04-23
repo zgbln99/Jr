@@ -101,14 +101,23 @@ export function Hero({
               {" "}Każda złotówka trafia do Fundacji Cancer Fighters.
             </span>
           </span>
-          <a
-            href={streamUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline decoration-white/30 underline-offset-4 hover:text-white hover:decoration-white transition-colors"
-          >
-            Oglądaj live na YouTube ↗
-          </a>
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+            <a
+              href={streamUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-white/30 underline-offset-4 hover:text-white hover:decoration-white transition-colors"
+            >
+              Oglądaj live na YouTube ↗
+            </a>
+            <span className="text-white/25" aria-hidden>·</span>
+            <a
+              href="/widget/generator"
+              className="underline decoration-white/30 underline-offset-4 hover:text-white hover:decoration-white transition-colors"
+            >
+              Widget do OBS dla streamerów
+            </a>
+          </div>
           <p className="text-white/40 text-[11px] uppercase tracking-[0.12em] mt-2">
             Strona fanowska · nieoficjalna
           </p>
