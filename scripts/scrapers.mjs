@@ -14,17 +14,32 @@
 import dns from "node:dns";
 dns.setDefaultResultOrder?.("ipv4first");
 
+// Optional HTTP proxy — same env var as the Playwright script so a single
+// PROXY_URL in .env hits both paths. Node's built-in fetch honours a
+// ProxyAgent via undici.
+let FETCH_DISPATCHER = null;
+if (process.env.PROXY_URL) {
+  try {
+    const { ProxyAgent } = await import("undici");
+    FETCH_DISPATCHER = new ProxyAgent(process.env.PROXY_URL);
+  } catch (err) {
+    console.warn("[scrapers] could not load undici ProxyAgent:", err.message);
+  }
+}
+
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
 async function fetchHtml(url) {
-  const res = await fetch(url, {
+  const opts = {
     headers: {
       "User-Agent": USER_AGENT,
       "Accept": "text/html,application/xhtml+xml",
       "Accept-Language": "pl,en;q=0.8",
     },
-  });
+  };
+  if (FETCH_DISPATCHER) opts.dispatcher = FETCH_DISPATCHER;
+  const res = await fetch(url, opts);
   if (!res.ok) {
     throw new Error(`${url} → HTTP ${res.status}`);
   }

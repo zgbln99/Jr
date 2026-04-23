@@ -27,6 +27,30 @@ if (!rawStreamUrl || !outPath) {
 
 const cookiesPath = process.env.YT_COOKIES;
 const waitAfterReady = Number(process.env.PLAYWRIGHT_WAIT ?? 4000);
+
+// Residential proxy URL. Required for YouTube to serve the player from a
+// VPS — OVH's entire IP space is flagged on Google's side. Full URL form
+// supported: http://user:pass@host:port  or  http://host:port
+//
+// Recommended providers at our volume (1 request / 5 min, ~5 MB / tick):
+//   - IPRoyal residential (pay-as-you-go, ~$1.80/GB)
+//   - Webshare (subscription, $3/mo for 100 MB)
+// See deploy/PROXY.md for full setup recipes.
+function parseProxy(raw) {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    const server = `${u.protocol}//${u.hostname}${u.port ? ":" + u.port : ""}`;
+    const proxy = { server };
+    if (u.username) proxy.username = decodeURIComponent(u.username);
+    if (u.password) proxy.password = decodeURIComponent(u.password);
+    return proxy;
+  } catch {
+    console.error("[playwright] PROXY_URL is not a valid URL:", raw);
+    return null;
+  }
+}
+const proxyConfig = parseProxy(process.env.PROXY_URL || process.env.HTTPS_PROXY);
 // Default order: youtube-nocookie (no GDPR consent wall) → embed → watch.
 // Most bot-detection paths for /watch can be skipped entirely by using
 // the embed players.
@@ -132,8 +156,15 @@ async function dumpDebug(page, label, reason) {
   }
 }
 
+if (proxyConfig) {
+  console.log(
+    `[playwright] using proxy ${proxyConfig.server}${proxyConfig.username ? " (authed)" : ""}`,
+  );
+}
+
 const browser = await chromium.launch({
   headless: true,
+  proxy: proxyConfig || undefined,
   args: [
     "--no-sandbox",
     "--disable-setuid-sandbox",
