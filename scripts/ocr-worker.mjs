@@ -55,6 +55,14 @@ if (!INTERNAL_TOKEN || INTERNAL_TOKEN.length < 32) {
   process.exit(1);
 }
 
+// YouTube rate-limits anonymous requests from VPS IP ranges ("Sign in to
+// confirm you're not a bot"). Workaround: point YT_COOKIES at a cookies.txt
+// file exported from a browser session that is logged into YouTube. Extra
+// yt-dlp arguments can also be passed through YT_EXTRA_ARGS if you want to
+// override the player client, user agent, etc.
+const YT_COOKIES = process.env.YT_COOKIES;
+const YT_EXTRA_ARGS = (process.env.YT_EXTRA_ARGS || "").split(" ").filter(Boolean);
+
 console.log(
   `[ocr] starting · engine=${ENGINE} · interval=${INTERVAL_MIN}min · stream=${STREAM_URL}`,
 );
@@ -113,13 +121,15 @@ async function grabFrame(streamUrl, outPath) {
   // emits HLS segment metadata ffmpeg can't parse as a raw AV stream.
   // Standard fix: use `yt-dlp -g` to resolve the direct m3u8 URL and let
   // ffmpeg pull HLS segments itself.
-  const { stdout } = await run("yt-dlp", [
+  const ytArgs = [
     "-q",
     "-g",
     "-f", "best[height<=720]/best",
     "--no-warnings",
-    streamUrl,
-  ]);
+  ];
+  if (YT_COOKIES) ytArgs.push("--cookies", YT_COOKIES);
+  ytArgs.push(...YT_EXTRA_ARGS, streamUrl);
+  const { stdout } = await run("yt-dlp", ytArgs);
   const urls = stdout.trim().split("\n").filter(Boolean);
   if (urls.length === 0) {
     throw new Error("yt-dlp returned no stream URL (is the stream still live?)");
