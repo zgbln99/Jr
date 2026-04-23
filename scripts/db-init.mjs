@@ -76,6 +76,18 @@ db.exec(`
     ON ocr_regions (enabled DESC, sort_order ASC, id ASC);
 `);
 
+// Post-launch additive columns — idempotent on older DBs too.
+for (const ddl of [
+  "ALTER TABLE ocr_regions ADD COLUMN last_amount REAL",
+  "ALTER TABLE ocr_regions ADD COLUMN last_parsed_at INTEGER",
+]) {
+  try {
+    db.exec(ddl);
+  } catch {
+    /* already there */
+  }
+}
+
 console.log(`[db] initialized at ${DB_PATH}`);
 db.close();
 

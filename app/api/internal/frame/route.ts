@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
-import { mkdtemp, rm, writeFile, stat } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { insertCounter, listEnabledRegions, type OcrRegion } from "@/lib/db";
+import {
+  insertCounter,
+  listEnabledRegions,
+  setRegionLastAmount,
+  type OcrRegion,
+} from "@/lib/db";
 import {
   cropRegion,
   extractAmounts,
@@ -14,14 +19,13 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-// Bigger than most Next.js API defaults — 720p PNGs weigh 300–600 KB,
-// but we want comfortable headroom for higher-res screenshots too.
 export const maxDuration = 60;
 
-// Accepts a PNG/JPEG frame from the home-relay, saves it to
-// data/last-frame.jpg, runs the regions-based OCR pipeline, stores the
-// summed amount into counter_readings, and returns the breakdown so the
-// relay can log what happened.
+// Minimum amount we trust as a "real" counter read. Below this the OCR
+// most likely caught a timestamp, donation tip, or stray digits — not
+// the actual running total. Keeps per-region memory sane.
+const MIN_AMOUNT = 100;
+
 export async function POST(req: Request) {
   const token = req.headers.get("x-internal-token");
   const expected = process.env.SESSION_SECRET;
@@ -29,9 +33,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Accept two upload styles:
-  //   * multipart/form-data with field "frame"
-  //   * raw body (image/png) — simpler for a curl / node fetch call
   let buffer: Buffer | null = null;
   const ctype = (req.headers.get("content-type") || "").toLowerCase();
   try {
@@ -55,16 +56,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Brakuje klatki" }, { status: 400 });
   }
 
-  // Persist the frame as the new "last seen" so the admin UI in
-  // /admin → Kalibracja OCR reflects it.
   mkdirSync(dirname(LAST_FRAME_PATH), { recursive: true });
   await writeFile(LAST_FRAME_PATH, buffer);
 
   const regions = listEnabledRegions();
   if (regions.length === 0) {
-    // No regions defined yet — the relay still uploaded a frame, which is
-    // useful for calibrating in the admin. We just can't extract amounts
-    // automatically until the user draws at least one rectangle.
     return NextResponse.json({
       saved: true,
       ocr: "skipped — brak zdefiniowanych obszarów w /admin → Kalibracja OCR",
@@ -74,54 +70,93 @@ export async function POST(req: Request) {
 
   const work = await mkdtemp(join(tmpdir(), "jrjr-ocr-push-"));
   try {
-    const allAmounts: number[] = [];
-    const perRegion: Array<{
+    // For each region, this run's OCR either produces a usable amount
+    // (updates region.last_amount) or fails (falls back to the stored
+    // last_amount). The summed total is Σ(current_or_last(region)).
+    //
+    // Regions that have never been parsed successfully AND don't parse
+    // this tick are excluded entirely — we don't want a brand-new
+    // untuned region to contribute 0 to what looks like a drop.
+    type RegionResult = {
       id: number;
       name: string | null;
-      amounts: number[];
-    }> = [];
+      parsedAmount: number | null;
+      usedAmount: number | null;
+      source: "fresh" | "cached" | "missing";
+      rawAmounts: number[];
+    };
+
+    const perRegion: RegionResult[] = [];
 
     for (const region of regions as OcrRegion[]) {
       const cropPath = join(work, `r${region.id}.png`);
+      let parsedAmount: number | null = null;
+      let rawAmounts: number[] = [];
+
       try {
         await cropRegion(LAST_FRAME_PATH, cropPath, region);
         const text = await runOcr(cropPath);
-        const amounts = extractAmounts(text);
-        perRegion.push({ id: region.id, name: region.name, amounts });
-        allAmounts.push(...amounts);
+        rawAmounts = extractAmounts(text);
+        // First credible amount wins. User draws tight rectangles around
+        // a single counter, so the first match is almost always the one
+        // we want (vs. a goal number or donor suffix).
+        const candidate = rawAmounts.find((a) => a >= MIN_AMOUNT);
+        if (candidate != null) parsedAmount = candidate;
       } catch (err) {
-        perRegion.push({ id: region.id, name: region.name, amounts: [] });
         console.error(`[frame] region ${region.id} OCR failed:`, err);
       }
+
+      let usedAmount: number | null;
+      let source: RegionResult["source"];
+      if (parsedAmount != null) {
+        usedAmount = parsedAmount;
+        source = "fresh";
+        // Persist this as the new "last good" for future misses.
+        try {
+          setRegionLastAmount(region.id, parsedAmount);
+        } catch (err) {
+          console.error(`[frame] failed to persist last_amount for region ${region.id}:`, err);
+        }
+      } else if (region.last_amount != null) {
+        usedAmount = region.last_amount;
+        source = "cached";
+      } else {
+        usedAmount = null;
+        source = "missing";
+      }
+
+      perRegion.push({
+        id: region.id,
+        name: region.name,
+        parsedAmount,
+        usedAmount,
+        source,
+        rawAmounts,
+      });
     }
 
-    // De-dup repeats that land in multiple regions
-    const seen = new Set<number>();
-    const picked: number[] = [];
-    for (const n of allAmounts) {
-      const k = Math.round(n * 100);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      picked.push(n);
-    }
-
-    if (picked.length === 0) {
+    const contributing = perRegion.filter((r) => r.usedAmount != null);
+    if (contributing.length === 0) {
       return NextResponse.json({
         saved: true,
-        ocr: "no amounts parsed",
+        ocr: "no regions have a known amount yet",
         perRegion,
       });
     }
 
-    const sum = picked.reduce((s, v) => s + v, 0);
-    const note = `home-relay ${picked.map((n) => n.toFixed(0)).join(" + ")}`;
+    const sum = contributing.reduce((s, r) => s + (r.usedAmount as number), 0);
+    const note =
+      "home-relay " +
+      contributing
+        .map((r) => `${r.source === "cached" ? "~" : ""}${r.usedAmount?.toFixed(0)}`)
+        .join(" + ");
     const row = insertCounter(sum, "ocr", note.slice(0, 500));
 
     return NextResponse.json({
       saved: true,
       ocr: "ok",
       sum,
-      amounts: picked,
+      amounts: contributing.map((r) => r.usedAmount),
       perRegion,
       counterId: row.id,
     });
@@ -129,6 +164,3 @@ export async function POST(req: Request) {
     await rm(work, { recursive: true, force: true });
   }
 }
-
-void stat;
-void copyFileSync;

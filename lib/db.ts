@@ -85,6 +85,19 @@ function migrate(db: Database.Database) {
       ON ocr_regions (enabled DESC, sort_order ASC, id ASC);
   `);
 
+  // Per-region "last successfully parsed" memory. Added after launch, so
+  // we guard each ALTER with try/catch for idempotency on old DBs.
+  for (const ddl of [
+    "ALTER TABLE ocr_regions ADD COLUMN last_amount REAL",
+    "ALTER TABLE ocr_regions ADD COLUMN last_parsed_at INTEGER",
+  ]) {
+    try {
+      db.exec(ddl);
+    } catch {
+      /* already added — fine */
+    }
+  }
+
   const seedSetting = db.prepare(`
     INSERT OR IGNORE INTO settings (key, value, updated_at)
     VALUES (?, ?, ?)
@@ -368,6 +381,11 @@ export type OcrRegion = {
   height: number;
   enabled: 0 | 1;
   sort_order: number;
+  // "last successfully parsed" value + timestamp. Null until the first
+  // successful OCR pass. When a tick fails to parse anything from this
+  // region, we fall back to this instead of contributing 0 to the sum.
+  last_amount: number | null;
+  last_parsed_at: number | null;
   created_at: number;
   updated_at: number;
 };
@@ -392,7 +410,11 @@ export function listEnabledRegions(): OcrRegion[] {
 }
 
 export function createRegion(
-  input: Omit<OcrRegion, "id" | "created_at" | "updated_at">,
+  input: Omit<
+    OcrRegion,
+    "id" | "created_at" | "updated_at" | "last_amount" | "last_parsed_at"
+  > &
+    Partial<Pick<OcrRegion, "last_amount" | "last_parsed_at">>,
 ): OcrRegion {
   const now = Date.now();
   const info = getDb()
@@ -411,7 +433,20 @@ export function createRegion(
       now,
       now,
     );
-  return { id: Number(info.lastInsertRowid), ...input, created_at: now, updated_at: now };
+  return {
+    id: Number(info.lastInsertRowid),
+    name: input.name,
+    x: input.x,
+    y: input.y,
+    width: input.width,
+    height: input.height,
+    enabled: input.enabled,
+    sort_order: input.sort_order,
+    last_amount: input.last_amount ?? null,
+    last_parsed_at: input.last_parsed_at ?? null,
+    created_at: now,
+    updated_at: now,
+  };
 }
 
 export function updateRegion(
@@ -444,4 +479,15 @@ export function updateRegion(
 
 export function deleteRegion(id: number) {
   getDb().prepare("DELETE FROM ocr_regions WHERE id = ?").run(id);
+}
+
+// Call this each time a region OCR pass yielded a usable amount. Keeps
+// a per-region "last known good" value so subsequent failed OCR ticks
+// can fall back to it instead of zeroing the region out.
+export function setRegionLastAmount(id: number, amount: number) {
+  getDb()
+    .prepare(
+      `UPDATE ocr_regions SET last_amount = ?, last_parsed_at = ? WHERE id = ?`,
+    )
+    .run(amount, Date.now(), id);
 }
