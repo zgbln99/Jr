@@ -56,6 +56,14 @@ export function WidgetCounter({
   const fromRef = useRef<number>(initial.amount);
   const toRef = useRef<number>(initial.amount);
   const startedRef = useRef<number>(0);
+  // Mirror of `displayed` so closures and RAF steps read the current
+  // value without getting frozen on the SSR initial.
+  const displayedRef = useRef<number>(initial.amount);
+
+  function writeDisplayed(v: number) {
+    displayedRef.current = v;
+    setDisplayed(v);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +82,7 @@ export function WidgetCounter({
         const prevAmount = toRef.current;
         const crossed = millionsCrossed(prevAmount, next.amount);
 
-        fromRef.current = displayed;
+        fromRef.current = displayedRef.current;
         toRef.current = next.amount;
         startedRef.current = performance.now();
         setPulse(true);
@@ -100,7 +108,7 @@ export function WidgetCounter({
     const step = (now: number) => {
       const t = Math.min(1, (now - startedRef.current) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
-      setDisplayed(fromRef.current + (toRef.current - fromRef.current) * eased);
+      writeDisplayed(fromRef.current + (toRef.current - fromRef.current) * eased);
       if (t < 1) rafRef.current = requestAnimationFrame(step);
       else rafRef.current = null;
     };
