@@ -27,7 +27,10 @@ if (!rawStreamUrl || !outPath) {
 
 const cookiesPath = process.env.YT_COOKIES;
 const waitAfterReady = Number(process.env.PLAYWRIGHT_WAIT ?? 4000);
-const strategies = (process.env.PLAYWRIGHT_STRATEGIES || "embed,watch")
+// Default order: youtube-nocookie (no GDPR consent wall) → embed → watch.
+// Most bot-detection paths for /watch can be skipped entirely by using
+// the embed players.
+const strategies = (process.env.PLAYWRIGHT_STRATEGIES || "nocookie,embed,watch")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
@@ -158,20 +161,66 @@ try {
       if (cookies.length > 0) await context.addCookies(cookies);
     }
 
+    // Pre-accept the EU consent dialog by dropping a SOCS / CONSENT cookie
+    // on both google.com and youtube.com. Values here are the ones a real
+    // browser would have after clicking "Zaakceptuj wszystko". Without
+    // these, /watch and /embed throw a full-screen "Zanim przejdziesz do
+    // YouTube" wall that the player waits behind — even with login cookies.
+    const consentCookies = [
+      ".youtube.com",
+      ".google.com",
+      "www.youtube.com",
+      "consent.youtube.com",
+    ].flatMap((domain) => [
+      {
+        name: "SOCS",
+        value: "CAISEwgBEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg",
+        domain,
+        path: "/",
+        secure: true,
+        httpOnly: false,
+        sameSite: "Lax",
+      },
+      {
+        name: "CONSENT",
+        value: "YES+cb",
+        domain,
+        path: "/",
+        secure: true,
+        httpOnly: false,
+        sameSite: "Lax",
+      },
+    ]);
+    await context.addCookies(consentCookies);
+
     const page = await context.newPage();
     page.setDefaultTimeout(30_000);
 
     try {
       await page.goto(target, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
-      // Dismiss consent dialog (EU) if present.
-      try {
-        await page
-          .getByRole("button", { name: /zaakceptuj wszystko|accept all/i })
-          .first()
-          .click({ timeout: 3000 });
-        await page.waitForTimeout(1500);
-      } catch {}
+      // Dismiss consent dialog (EU) if the preemptive cookies didn't
+      // do the trick. Google sometimes renders the dialog in an iframe
+      // (consent.youtube.com) so we look in frames too.
+      const consentLocators = [
+        page.getByRole("button", { name: /zaakceptuj wszystko|accept all/i }),
+        page.locator('button[aria-label*="Zaakceptuj" i]'),
+        page.locator('button:has-text("Zaakceptuj wszystko")'),
+      ];
+      for (const frame of page.frames()) {
+        consentLocators.push(
+          frame.getByRole?.("button", { name: /zaakceptuj wszystko|accept all/i }) ||
+            frame.locator('button:has-text("Zaakceptuj wszystko")'),
+        );
+      }
+      for (const loc of consentLocators) {
+        try {
+          await loc.first().click({ timeout: 1500 });
+          await page.waitForTimeout(1000);
+          console.log("[playwright] clicked consent 'Zaakceptuj wszystko'");
+          break;
+        } catch {}
+      }
 
       // Race: video with dimensions vs "bot check" text.
       await Promise.race([
