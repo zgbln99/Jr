@@ -7,6 +7,13 @@
 // Each scraper returns the amount in PLN (float). When the page layout
 // changes, the parser logs what it saw so you can iterate quickly.
 
+// Some donation hosts are fronted by Cloudflare and behave differently
+// over IPv6 vs IPv4. On VPS IPs YouTube in particular blocks IPv6, and
+// Node prefers IPv6 by default. Force IPv4-first DNS resolution system-
+// wide-lite: affects every `fetch` / dns lookup this process makes.
+import dns from "node:dns";
+dns.setDefaultResultOrder?.("ipv4first");
+
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 

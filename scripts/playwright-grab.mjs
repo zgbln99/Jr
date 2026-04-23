@@ -123,6 +123,10 @@ const browser = await chromium.launch({
     "--disable-blink-features=AutomationControlled",
     "--disable-dev-shm-usage",
     "--autoplay-policy=no-user-gesture-required",
+    // YouTube treats OVH's entire IPv6 block as suspicious and serves a
+    // reCAPTCHA / "Error 153" page. The VPS's IPv4 address is not on the
+    // same blocklist. Force Chromium to resolve over IPv4 only.
+    "--disable-ipv6",
   ],
 });
 
