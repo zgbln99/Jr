@@ -1,18 +1,9 @@
 import {
   getAllSettings,
   getLatestCounter,
-  listGuests,
-  listMedia,
 } from "@/lib/db";
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
-import { About } from "@/components/About";
-import { Initiators } from "@/components/Initiators";
-import { Foundation } from "@/components/Foundation";
-import { Guests } from "@/components/Guests";
-import { Media } from "@/components/Media";
-import { LiveEmbed } from "@/components/LiveEmbed";
-import { HowToHelp } from "@/components/HowToHelp";
 import { Footer } from "@/components/Footer";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +29,6 @@ function extractYoutubeId(url: string): string | null {
 export default function Home() {
   const settings = getAllSettings();
   const counterRow = getLatestCounter();
-  const guests = listGuests();
-  const media = listMedia();
 
   const counter = {
     amount: counterRow?.amount_pln ?? 0,
@@ -69,21 +58,6 @@ export default function Home() {
           counter={counter}
           countdownEnd={settings.stream_end_iso || null}
         />
-        <About text={settings.about_text} />
-        <Initiators
-          text={settings.initiators_text}
-          latwogangIg={settings.latwogang_ig || undefined}
-          bedoesIg={settings.bedoes_ig || undefined}
-        />
-        <Foundation
-          text={settings.foundation_text}
-          url={settings.foundation_url || undefined}
-          instagram={settings.cancerfighters_ig || undefined}
-        />
-        <Guests guests={guests} />
-        <Media items={media} />
-        <LiveEmbed streamUrl={STREAM_URL} />
-        <HowToHelp donations={donations} />
       </main>
       <Footer foundationUrl={settings.foundation_url || undefined} />
     </>

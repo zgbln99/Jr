@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Counter } from "./Counter";
 import { Countdown } from "./Countdown";
 
@@ -29,12 +30,11 @@ export function Hero({
           sizes="100vw"
           className="object-cover"
         />
-        {/* Layered darkening so content on top pops without hiding the image */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/65 to-vf-charcoal" />
         <div className="absolute inset-0 bg-black/30" />
       </div>
 
-      <div className="max-w-[1440px] mx-auto px-5 md:px-8 pt-28 pb-20 md:pt-36 md:pb-32 min-h-[92vh] flex flex-col items-center justify-center text-center">
+      <div className="max-w-[1440px] mx-auto px-5 md:px-8 pt-24 pb-16 md:pt-32 md:pb-20 min-h-screen flex flex-col items-center justify-center text-center">
         {/* Top row — LIVE tag + brand line + countdown */}
         <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-vf-red text-white text-[11px] font-bold uppercase tracking-[0.14em]">
@@ -61,7 +61,7 @@ export function Hero({
         </h1>
 
         {/* FOCAL POINT — huge centered counter */}
-        <div className="w-full max-w-4xl">
+        <div className="w-full max-w-5xl">
           <p className="eyebrow text-white/60 mb-4 md:mb-6">
             Zebrano dotychczas
           </p>
@@ -80,13 +80,8 @@ export function Hero({
               Wpłać — {donation.label}
             </a>
           ) : null}
-          <a
-            href={streamUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-pill-ghost"
-          >
-            Oglądaj live
+          <Link href="/o-akcji" className="btn-pill-ghost">
+            Dowiedz się więcej
             <svg
               aria-hidden
               className="ml-2"
@@ -103,31 +98,42 @@ export function Hero({
                 strokeLinejoin="round"
               />
             </svg>
-          </a>
+          </Link>
         </div>
 
-        {/* Reassurance — tiny */}
-        <p className="mt-8 text-white/70 text-[13px] flex items-center gap-2 max-w-[42ch] mx-auto">
-          <svg
-            aria-hidden
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="none"
-            className="text-vf-red shrink-0"
-          >
-            <path
-              d="M3 8.5l3 3 7-7"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span>
-            <strong className="text-white font-semibold">100% bez prowizji.</strong> Każda złotówka trafia do fundacji.
+        {/* Secondary utility links + reassurance */}
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-white/70 text-[13px]">
+          <span className="flex items-center gap-2">
+            <svg
+              aria-hidden
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="text-vf-red shrink-0"
+            >
+              <path
+                d="M3 8.5l3 3 7-7"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>
+              <strong className="text-white font-semibold">100% bez prowizji.</strong>
+            </span>
           </span>
-        </p>
+          <span className="hidden sm:inline text-white/30">·</span>
+          <a
+            href={streamUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-white/30 underline-offset-4 hover:text-white hover:decoration-white transition-colors"
+          >
+            Oglądaj live na YouTube ↗
+          </a>
+        </div>
       </div>
     </section>
   );

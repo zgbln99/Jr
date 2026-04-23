@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo } from "./Logo";
 
 export function Footer({ foundationUrl }: { foundationUrl?: string }) {
@@ -20,16 +21,48 @@ export function Footer({ foundationUrl }: { foundationUrl?: string }) {
           <div>
             <p className="eyebrow text-white/60 mb-4">Akcja</p>
             <ul className="space-y-3">
-              <li><a href="#o-akcji" className="text-white/90 hover:text-vf-red text-[14px]">O akcji</a></li>
-              <li><a href="#goscie" className="text-white/90 hover:text-vf-red text-[14px]">Goście</a></li>
-              <li><a href="#media" className="text-white/90 hover:text-vf-red text-[14px]">Media</a></li>
-              <li><a href="#live" className="text-white/90 hover:text-vf-red text-[14px]">Live</a></li>
+              <li>
+                <Link href="/" className="text-white/90 hover:text-vf-red text-[14px]">
+                  Licznik
+                </Link>
+              </li>
+              <li>
+                <Link href="/o-akcji" className="text-white/90 hover:text-vf-red text-[14px]">
+                  O akcji
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/o-akcji#goscie"
+                  className="text-white/90 hover:text-vf-red text-[14px]"
+                >
+                  Goście
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/o-akcji#media"
+                  className="text-white/90 hover:text-vf-red text-[14px]"
+                >
+                  Media
+                </Link>
+              </li>
             </ul>
           </div>
 
           <div>
-            <p className="eyebrow text-white/60 mb-4">Fundacja</p>
+            <p className="eyebrow text-white/60 mb-4">Dla streamerów</p>
             <ul className="space-y-3">
+              <li>
+                <a
+                  href="/widget"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/90 hover:text-vf-red text-[14px]"
+                >
+                  Widget OBS
+                </a>
+              </li>
               {foundationUrl ? (
                 <li>
                   <a
@@ -38,11 +71,18 @@ export function Footer({ foundationUrl }: { foundationUrl?: string }) {
                     rel="noopener noreferrer"
                     className="text-white/90 hover:text-vf-red text-[14px]"
                   >
-                    Cancer Fighters
+                    Fundacja
                   </a>
                 </li>
               ) : null}
-              <li><a href="#pomoc" className="text-white/90 hover:text-vf-red text-[14px]">Jak pomóc</a></li>
+              <li>
+                <Link
+                  href="/o-akcji#pomoc"
+                  className="text-white/90 hover:text-vf-red text-[14px]"
+                >
+                  Jak pomóc
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

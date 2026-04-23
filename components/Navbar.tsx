@@ -5,12 +5,12 @@ import Link from "next/link";
 import { Logo } from "./Logo";
 
 const NAV_LINKS = [
-  { href: "#o-akcji", label: "O akcji" },
-  { href: "#inicjatorzy", label: "Inicjatorzy" },
-  { href: "#fundacja", label: "Fundacja" },
-  { href: "#goscie", label: "Goście" },
-  { href: "#media", label: "Media" },
-  { href: "#live", label: "Live" },
+  { href: "/o-akcji#o-akcji", label: "O akcji" },
+  { href: "/o-akcji#inicjatorzy", label: "Inicjatorzy" },
+  { href: "/o-akcji#fundacja", label: "Fundacja" },
+  { href: "/o-akcji#goscie", label: "Goście" },
+  { href: "/o-akcji#media", label: "Media" },
+  { href: "/o-akcji#live", label: "Live" },
 ];
 
 export function Navbar({ donationUrl }: { donationUrl?: string }) {
