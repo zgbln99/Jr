@@ -1,0 +1,9 @@
+# Drop your static assets here:
+#   logo.png        — site logo (optional; shown nowhere currently, but
+#                     reserved for when the minimal hero gets a mark again)
+#   favicon.ico     — browser tab icon
+#   og-image.png    — 1200×630 social share preview (referenced in
+#                     app/layout.tsx via openGraph.images when present)
+#
+# Files in /public are served verbatim from the site root:
+#   /var/www/jrjr/public/logo.png  →  https://jrjr.pl/logo.png
