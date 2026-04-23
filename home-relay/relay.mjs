@@ -1,14 +1,25 @@
 #!/usr/bin/env node
 // Home relay for jrjr.pl OCR counter.
-// Runs on a residential-IP machine, so YouTube serves the player normally.
+//
+// Strategy: Playwright opens YouTube in headless Chromium. We don't wait
+// for the <video> element to paint — instead we SNIFF the network traffic
+// and grab the first m3u8 HLS manifest URL the player requests. Then
+// ffmpeg pulls one frame from that URL. That skirts around:
+//   - the consent wall (player JS still fires the manifest request even
+//     if the dialog is in the way),
+//   - slow video first-paint,
+//   - ad pre-rolls.
+// Uses ffmpeg-static so Windows users don't need to install anything.
 
 import { chromium } from "playwright";
+import ffmpegPath from "ffmpeg-static";
 import {
   readFileSync,
   existsSync,
   mkdirSync,
   writeFileSync,
 } from "node:fs";
+import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -38,7 +49,6 @@ const SECRET = process.env.SESSION_SECRET || "";
 const STREAM_URL =
   process.env.STREAM_URL || "https://www.youtube.com/live/UNAqqHIPbWA";
 const INTERVAL = Math.max(1, Number(process.env.INTERVAL_MINUTES) || 5);
-const WAIT_AFTER = Number(process.env.PLAYWRIGHT_WAIT || 4000);
 const DEBUG_DIR = process.env.DEBUG_DIR || join(process.cwd(), "debug");
 
 if (!VPS_URL || !SECRET) {
@@ -67,42 +77,24 @@ if (!videoId) {
   process.exit(2);
 }
 
-function urlFor(strategy) {
-  if (strategy === "nocookie") {
-    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1`;
-  }
-  if (strategy === "embed") {
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
-  }
-  if (strategy === "watch") {
-    return `https://www.youtube.com/watch?v=${videoId}`;
-  }
-  return null;
+function run(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "", stderr = "";
+    p.stdout.on("data", (d) => (stdout += d));
+    p.stderr.on("data", (d) => (stderr += d));
+    p.on("error", reject);
+    p.on("close", (code) => {
+      if (code === 0) resolve({ stdout, stderr });
+      else reject(new Error(`${cmd} exit ${code}: ${stderr.slice(0, 400)}`));
+    });
+  });
 }
 
-async function dumpDebug(page, label, reason) {
-  try {
-    mkdirSync(DEBUG_DIR, { recursive: true });
-    const stamp = `${label}-${Date.now()}`;
-    const url = page.url();
-    await page.screenshot({ path: join(DEBUG_DIR, `${stamp}.png`), fullPage: true });
-    const html = await page.content();
-    writeFileSync(join(DEBUG_DIR, `${stamp}.html`), html);
-    writeFileSync(
-      join(DEBUG_DIR, `${stamp}.txt`),
-      `reason: ${reason}\nurl: ${url}\nrequested: ${STREAM_URL}\n`,
-    );
-    const sniff = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 300);
-    console.error(`[relay] debug saved to ${DEBUG_DIR}\\${stamp}.{png,html,txt}`);
-    console.error(`[relay] page URL: ${url}`);
-    console.error(`[relay] text sniff: ${sniff}`);
-  } catch (err) {
-    console.error(`[relay] debug dump failed: ${err.message}`);
-  }
-}
-
-async function grabFrameWithStrategies(outPath) {
-  const strategies = ["nocookie", "embed", "watch"];
+// Playwright + network interception: open YouTube, capture the first
+// googlevideo.com m3u8 manifest URL the player fetches, close the
+// browser, then use ffmpeg to pull a frame from that manifest.
+async function captureManifestUrl() {
   const browser = await chromium.launch({
     headless: true,
     args: [
@@ -111,124 +103,98 @@ async function grabFrameWithStrategies(outPath) {
       "--autoplay-policy=no-user-gesture-required",
     ],
   });
-  let lastError = null;
   try {
-    for (const strategy of strategies) {
-      const target = urlFor(strategy);
-      const context = await browser.newContext({
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        viewport: { width: 1280, height: 720 },
-        locale: "pl-PL",
-        timezoneId: "Europe/Warsaw",
-      });
+    const context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 720 },
+      locale: "pl-PL",
+      timezoneId: "Europe/Warsaw",
+    });
 
-      // Preemptive consent cookies — "I already clicked Accept All".
-      const consent = [".youtube.com", ".google.com", "www.youtube.com"].flatMap(
-        (domain) => [
-          {
-            name: "SOCS",
-            value: "CAISEwgBEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg",
-            domain,
-            path: "/",
-            secure: true,
-            httpOnly: false,
-            sameSite: "Lax",
-          },
-          {
-            name: "CONSENT",
-            value: "YES+cb",
-            domain,
-            path: "/",
-            secure: true,
-            httpOnly: false,
-            sameSite: "Lax",
-          },
-        ],
-      );
-      await context.addCookies(consent);
+    // Preemptive consent so player JS doesn't get gated by the dialog.
+    const consent = [".youtube.com", ".google.com", "www.youtube.com"].flatMap(
+      (domain) => [
+        { name: "SOCS", value: "CAISEwgBEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg", domain, path: "/", secure: true, httpOnly: false, sameSite: "Lax" },
+        { name: "CONSENT", value: "YES+cb", domain, path: "/", secure: true, httpOnly: false, sameSite: "Lax" },
+      ],
+    );
+    await context.addCookies(consent);
 
-      const page = await context.newPage();
-      page.setDefaultTimeout(30_000);
+    const page = await context.newPage();
+    page.setDefaultTimeout(30_000);
 
+    let manifestUrl = null;
+    page.on("request", (req) => {
+      const u = req.url();
+      if (
+        /manifest\.googlevideo\.com\/api\/manifest\/hls/i.test(u) &&
+        /\.m3u8(?:\?|$)/.test(u) &&
+        !manifestUrl
+      ) {
+        manifestUrl = u;
+      }
+    });
+
+    // Try a handful of URLs — some paths trigger the manifest request faster.
+    const targets = [
+      `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1`,
+      `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`,
+      `https://www.youtube.com/watch?v=${videoId}`,
+    ];
+
+    for (const target of targets) {
+      if (manifestUrl) break;
       try {
-        console.log(`[relay] strategy=${strategy} → ${target}`);
-        await page.goto(target, { waitUntil: "domcontentloaded" });
-
-        // Try to click "Zaakceptuj wszystko" in any frame.
-        const tryClick = async (root) => {
-          const selectors = [
-            'button:has-text("Zaakceptuj wszystko")',
-            'button:has-text("Accept all")',
-            'button[aria-label*="Zaakceptuj" i]',
-            'button[aria-label*="accept all" i]',
-          ];
-          for (const sel of selectors) {
-            try {
-              await root.locator(sel).first().click({ timeout: 1200 });
-              return true;
-            } catch {}
-          }
-          return false;
-        };
-        if (await tryClick(page)) {
-          console.log("[relay] clicked consent 'Zaakceptuj wszystko'");
-          await page.waitForTimeout(1000);
-        } else {
-          for (const frame of page.frames()) {
-            if (await tryClick(frame)) {
-              console.log("[relay] clicked consent in iframe");
-              await page.waitForTimeout(1000);
-              break;
-            }
-          }
-        }
-
-        await Promise.race([
-          page.waitForFunction(
-            () => {
-              const v = document.querySelector("video");
-              return v && v.videoWidth > 0 && v.videoHeight > 0;
-            },
-            null,
-            { timeout: 25_000 },
-          ),
-          page
-            .waitForFunction(
-              () =>
-                /confirm you.?re not a bot|sign in to confirm|potwierdzić.*bot/i.test(
-                  document.body?.innerText || "",
-                ),
-              null,
-              { timeout: 25_000 },
-            )
-            .then(() => {
-              throw new Error("bot-check intercepted");
-            }),
-        ]);
-        await page.waitForTimeout(WAIT_AFTER);
-
-        const videoHandle = await page.$("video");
-        if (videoHandle) {
-          await videoHandle.screenshot({ path: outPath });
-        } else {
-          await page.screenshot({ path: outPath, fullPage: false });
-        }
-
-        console.log(`[relay] strategy=${strategy} OK`);
-        await context.close();
-        return;
+        console.log(`[relay] opening ${target}`);
+        await page.goto(target, { waitUntil: "domcontentloaded", timeout: 20_000 });
       } catch (err) {
-        lastError = err;
-        console.error(`[relay] strategy=${strategy} failed: ${err.message}`);
-        await dumpDebug(page, strategy, err.message).catch(() => {});
-        await context.close();
+        console.warn(`[relay] goto failed for ${target}: ${err.message}`);
+        continue;
+      }
+
+      // Best-effort consent click
+      try {
+        await page
+          .locator('button:has-text("Zaakceptuj wszystko"), button:has-text("Accept all")')
+          .first()
+          .click({ timeout: 1500 });
+      } catch {}
+
+      // Wait up to 20 s for the player to request the manifest. Poll
+      // frequently so we can return the instant we see it.
+      const deadline = Date.now() + 20_000;
+      while (!manifestUrl && Date.now() < deadline) {
+        await page.waitForTimeout(200);
       }
     }
-    throw lastError || new Error("all strategies exhausted");
+
+    if (!manifestUrl) {
+      try {
+        mkdirSync(DEBUG_DIR, { recursive: true });
+        const stamp = `no-manifest-${Date.now()}`;
+        await page.screenshot({ path: join(DEBUG_DIR, `${stamp}.png`), fullPage: true });
+        writeFileSync(join(DEBUG_DIR, `${stamp}.html`), await page.content());
+        console.error(`[relay] debug saved to ${DEBUG_DIR}`);
+      } catch {}
+    }
+    return manifestUrl;
   } finally {
     await browser.close();
   }
+}
+
+async function ffmpegGrabFrame(manifestUrl, outPath) {
+  await run(ffmpegPath, [
+    "-hide_banner",
+    "-loglevel", "error",
+    "-y",
+    "-rw_timeout", "30000000",
+    "-i", manifestUrl,
+    "-frames:v", "1",
+    "-q:v", "2",
+    outPath,
+  ]);
 }
 
 async function uploadFrame(pngPath) {
@@ -236,16 +202,14 @@ async function uploadFrame(pngPath) {
   const res = await fetch(`${VPS_URL}/api/internal/frame`, {
     method: "POST",
     headers: {
-      "Content-Type": "image/png",
+      "Content-Type": "image/jpeg",
       "Content-Length": String(body.length),
       "x-internal-token": SECRET,
     },
     body,
   });
   const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`upload → ${res.status} ${text.slice(0, 300)}`);
-  }
+  if (!res.ok) throw new Error(`upload → ${res.status} ${text.slice(0, 300)}`);
   try {
     return JSON.parse(text);
   } catch {
@@ -256,19 +220,26 @@ async function uploadFrame(pngPath) {
 async function tick() {
   const workDir = join(tmpdir(), `jrjr-relay-${Date.now()}`);
   mkdirSync(workDir, { recursive: true });
-  const pngPath = join(workDir, "frame.png");
+  const framePath = join(workDir, "frame.jpg");
+
   try {
     const t0 = Date.now();
-    await grabFrameWithStrategies(pngPath);
-    const grabbedIn = Date.now() - t0;
+    const manifestUrl = await captureManifestUrl();
+    if (!manifestUrl) throw new Error("could not intercept m3u8 manifest");
+    const sniffMs = Date.now() - t0;
+    console.log(`[relay] manifest intercepted in ${sniffMs}ms`);
 
     const t1 = Date.now();
-    const result = await uploadFrame(pngPath);
-    const uploadIn = Date.now() - t1;
+    await ffmpegGrabFrame(manifestUrl, framePath);
+    const ffmpegMs = Date.now() - t1;
+
+    const t2 = Date.now();
+    const result = await uploadFrame(framePath);
+    const uploadMs = Date.now() - t2;
 
     const sum = result.sum != null ? `${result.sum.toFixed(2)} PLN` : result.ocr || "?";
     console.log(
-      `[relay] ${new Date().toISOString()}  grab=${grabbedIn}ms upload=${uploadIn}ms  sum=${sum}`,
+      `[relay] ${new Date().toISOString()}  sniff=${sniffMs}ms ffmpeg=${ffmpegMs}ms upload=${uploadMs}ms  sum=${sum}`,
     );
     if (result.perRegion) {
       for (const r of result.perRegion) {
