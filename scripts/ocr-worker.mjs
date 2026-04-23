@@ -108,48 +108,36 @@ function run(cmd, args, { input } = {}) {
 }
 
 async function grabFrame(streamUrl, outPath) {
-  // yt-dlp streams the HLS URL to stdout, ffmpeg takes one frame.
-  return new Promise((resolve, reject) => {
-    const yt = spawn(
-      "yt-dlp",
-      [
-        "-q",
-        "-o", "-",
-        "-f", "best[height<=720]/best",
-        "--no-part",
-        streamUrl,
-      ],
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
-    const ff = spawn(
-      "ffmpeg",
-      [
-        "-hide_banner",
-        "-loglevel", "error",
-        "-y",
-        "-i", "pipe:0",
-        "-frames:v", "1",
-        "-q:v", "2",
-        outPath,
-      ],
-      { stdio: ["pipe", "pipe", "pipe"] },
-    );
+  // For YouTube live streams, piping yt-dlp's muxed output into ffmpeg
+  // fails ("Invalid data found when processing input") because yt-dlp
+  // emits HLS segment metadata ffmpeg can't parse as a raw AV stream.
+  // Standard fix: use `yt-dlp -g` to resolve the direct m3u8 URL and let
+  // ffmpeg pull HLS segments itself.
+  const { stdout } = await run("yt-dlp", [
+    "-q",
+    "-g",
+    "-f", "best[height<=720]/best",
+    "--no-warnings",
+    streamUrl,
+  ]);
+  const urls = stdout.trim().split("\n").filter(Boolean);
+  if (urls.length === 0) {
+    throw new Error("yt-dlp returned no stream URL (is the stream still live?)");
+  }
+  // yt-dlp sometimes prints two URLs (video + audio). The first is video.
+  const mediaUrl = urls[0];
 
-    yt.stdout.pipe(ff.stdin);
-    yt.stderr.on("data", () => {});
-    let ffErr = "";
-    ff.stderr.on("data", (d) => (ffErr += d.toString()));
-
-    ff.on("close", (code) => {
-      try {
-        yt.kill("SIGTERM");
-      } catch {}
-      if (code === 0) resolve();
-      else reject(new Error(`ffmpeg exited ${code}: ${ffErr.trim()}`));
-    });
-    yt.on("error", reject);
-    ff.on("error", reject);
-  });
+  await run("ffmpeg", [
+    "-hide_banner",
+    "-loglevel", "error",
+    "-y",
+    // 30-second read timeout so a bad HLS segment can't hang the worker
+    "-rw_timeout", "30000000",
+    "-i", mediaUrl,
+    "-frames:v", "1",
+    "-q:v", "2",
+    outPath,
+  ]);
 }
 
 async function cropFrame(inPath, outPath) {
