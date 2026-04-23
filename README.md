@@ -65,6 +65,12 @@ Worker wymaga `yt-dlp`, `ffmpeg` i albo `paddleocr` (zalecane), albo `tesseract-
 
 ## Deployment na VPS (Ubuntu/Debian)
 
+> Wdrażasz na **Mikrusa**? Przeczytaj najpierw [`deploy/MIKRUS.md`](deploy/MIKRUS.md) —
+> jest krok po kroku, z uwzględnieniem ograniczeń RAM-u (Tesseract zamiast
+> PaddleOCR), portu 8010, proxy WWW Mikrusa i wystawienia na domenie jrjr.pl.
+
+Dla dowolnego VPS-a Ubuntu/Debian:
+
 1. **Instalacja zależności systemowych**:
 
    ```bash

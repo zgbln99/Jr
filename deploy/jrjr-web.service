@@ -8,9 +8,14 @@ User=jrjr
 Group=jrjr
 WorkingDirectory=/var/www/jrjr
 EnvironmentFile=/var/www/jrjr/.env
-ExecStart=/usr/bin/npm run start
+# Port / HOSTNAME come from EnvironmentFile (.env). Default on Mikrus
+# deploy: PORT=8010, HOSTNAME=127.0.0.1 (behind Mikrus proxy).
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start
 Restart=always
 RestartSec=5
+# Modest memory cap — if Next.js ever leaks, systemd kills + restarts it
+# rather than taking the whole Mikrus VPS down.
+MemoryMax=512M
 StandardOutput=journal
 StandardError=journal
 # Security hardening
