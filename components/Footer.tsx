@@ -1,14 +1,16 @@
+import { Logo } from "./Logo";
+
 export function Footer({ foundationUrl }: { foundationUrl?: string }) {
   return (
     <footer className="bg-vf-charcoal text-white">
       <div className="max-w-[1440px] mx-auto px-5 md:px-8 py-16 md:py-20">
         <div className="grid md:grid-cols-4 gap-10">
           <div className="md:col-span-2 max-w-md">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="relative inline-block h-9 w-9 rounded-full bg-vf-red">
-                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white" />
-              </span>
-              <span className="text-[15px] font-bold uppercase tracking-wider">jrjr.pl</span>
+            <div className="mb-5">
+              <Logo
+                size={36}
+                textClassName="text-[15px] font-bold uppercase tracking-wider"
+              />
             </div>
             <p className="text-white/70 text-[14px] leading-relaxed">
               Strona nieoficjalna, fanowska. Nie jest powiązana z Łatwogang, Bedoes ani Fundacją Cancer Fighters. Powstała tylko po to, żeby zwiększyć zasięg akcji charytatywnej.

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Logo } from "./Logo";
 
 const NAV_LINKS = [
   { href: "#o-akcji", label: "O akcji" },
@@ -34,18 +35,13 @@ export function Navbar({ donationUrl }: { donationUrl?: string }) {
       }`}
     >
       <nav className="max-w-[1440px] mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          {/* VF speech-mark-inspired red dot */}
-          <span className="relative inline-block h-9 w-9 rounded-full bg-vf-red">
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white" />
-          </span>
-          <span
-            className={`font-bold text-[15px] tracking-wider uppercase ${
+        <Link href="/" className="block">
+          <Logo
+            size={36}
+            textClassName={`font-bold text-[15px] tracking-wider uppercase ${
               dark ? "text-white" : "text-vf-charcoal"
             }`}
-          >
-            jrjr.pl
-          </span>
+          />
         </Link>
 
         <ul className="hidden md:flex items-center gap-8">

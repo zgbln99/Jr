@@ -27,51 +27,49 @@ export function Hero({
           fill
           priority
           sizes="100vw"
-          className="object-cover scale-105"
+          className="object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/60 to-vf-charcoal" />
+        {/* Layered darkening so content on top pops without hiding the image */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/65 to-vf-charcoal" />
+        <div className="absolute inset-0 bg-black/30" />
       </div>
 
-      <div className="max-w-[1440px] mx-auto px-5 md:px-8 pt-32 pb-20 md:pt-44 md:pb-32">
-        {/* Eyebrow tag — "LIVE" */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="max-w-[1440px] mx-auto px-5 md:px-8 pt-28 pb-20 md:pt-36 md:pb-32 min-h-[92vh] flex flex-col items-center justify-center text-center">
+        {/* Top row — LIVE tag + brand line + countdown */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-vf-red text-white text-[11px] font-bold uppercase tracking-[0.14em]">
             <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
             Na żywo
           </span>
           <span className="eyebrow text-white/70">
-            Łatwogang · Bedoes · Cancer Fighters
+            Łatwogang × Bedoes × Cancer Fighters
           </span>
           {countdownEnd ? <Countdown endsAt={countdownEnd} /> : null}
         </div>
 
-        {/* Monumental display headline */}
+        {/* Monumental headline, smaller than before so counter dominates */}
         <h1
-          className="display text-white max-w-[18ch]"
+          className="display text-white max-w-[18ch] mb-10 md:mb-14"
           style={{
-            fontSize: "clamp(3rem, 11vw, 9rem)",
-            lineHeight: 0.88,
+            fontSize: "clamp(2.5rem, 7vw, 5.5rem)",
+            lineHeight: 0.92,
             letterSpacing: "-0.025em",
           }}
         >
-          Dziewięć dni.
-          <br />
+          Dziewięć dni.{" "}
           <span className="text-vf-red">Jeden cel.</span>
         </h1>
 
-        <p className="mt-8 max-w-2xl text-white/80 text-[18px] md:text-[20px] leading-relaxed">
-          Łatwogang przez dziewięć dni non-stop słucha utworu Mai i Bedoesa.
-          Każda złotówka trafia do Fundacji Cancer Fighters — 100% bez prowizji.
-        </p>
-
-        {/* Counter — huge number, tabular */}
-        <div className="mt-12 md:mt-16">
-          <p className="eyebrow text-white/60 mb-3">Zebrano dotychczas</p>
+        {/* FOCAL POINT — huge centered counter */}
+        <div className="w-full max-w-4xl">
+          <p className="eyebrow text-white/60 mb-4 md:mb-6">
+            Zebrano dotychczas
+          </p>
           <Counter initial={counter} />
         </div>
 
-        {/* CTA pair */}
-        <div className="mt-10 flex flex-wrap items-center gap-4">
+        {/* CTA pair — center-aligned */}
+        <div className="mt-12 md:mt-16 flex flex-wrap items-center justify-center gap-4">
           {donation ? (
             <a
               href={donation.url}
@@ -108,14 +106,15 @@ export function Hero({
           </a>
         </div>
 
-        <p className="mt-6 text-white/60 text-[13px] flex items-center gap-2">
+        {/* Reassurance — tiny */}
+        <p className="mt-8 text-white/70 text-[13px] flex items-center gap-2 max-w-[42ch] mx-auto">
           <svg
             aria-hidden
             width="14"
             height="14"
             viewBox="0 0 16 16"
             fill="none"
-            className="text-vf-red"
+            className="text-vf-red shrink-0"
           >
             <path
               d="M3 8.5l3 3 7-7"
@@ -126,7 +125,7 @@ export function Hero({
             />
           </svg>
           <span>
-            <strong className="text-white">100% bez prowizji.</strong> Każda złotówka trafia do fundacji.
+            <strong className="text-white font-semibold">100% bez prowizji.</strong> Każda złotówka trafia do fundacji.
           </span>
         </p>
       </div>

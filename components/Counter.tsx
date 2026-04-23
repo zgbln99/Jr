@@ -89,23 +89,25 @@ export function Counter({ initial }: { initial: CounterData }) {
   const stale = data.updatedAt ? Date.now() - data.updatedAt > 15 * 60_000 : true;
 
   return (
-    <div>
+    <div className="flex flex-col items-center">
       <div
-        className="display tnum text-white"
+        className="display tnum text-white text-center leading-none"
         style={{
-          fontSize: "clamp(3.5rem, 14vw, 9rem)",
-          lineHeight: 0.9,
-          letterSpacing: "-0.035em",
+          fontSize: "clamp(3.5rem, 16vw, 11rem)",
+          letterSpacing: "-0.04em",
+          // A tiny horizontal nudge because the zł currency symbol optically
+          // pulls the number off-centre on wide displays.
         }}
       >
         {formatPLN(Math.round(displayed))}
       </div>
 
-      <div className="mt-4 flex items-center gap-3 text-white/60 text-[13px]">
+      <div className="mt-5 inline-flex items-center gap-2.5 text-white/70 text-[12px] uppercase tracking-[0.08em]">
         <span
           className={`inline-block h-2 w-2 rounded-full ${
             stale ? "bg-yellow-400" : "bg-green-500"
           }`}
+          aria-hidden
         />
         <span className="tnum">
           {data.source === "manual" ? "Potwierdzono ręcznie" : "Z transmisji"}
