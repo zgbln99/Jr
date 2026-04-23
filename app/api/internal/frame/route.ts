@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import {
+  getLatestCounter,
   insertCounter,
   listEnabledRegions,
   setRegionLastAmount,
@@ -145,6 +146,31 @@ export async function POST(req: Request) {
     }
 
     const sum = contributing.reduce((s, r) => s + (r.usedAmount as number), 0);
+
+    // Monotonic guard: the running total only goes up. OCR-induced drops
+    // are virtually always misreads — a missing digit ("6 123 456" read as
+    // "123 456"), OCR latching onto the goal line instead of the current
+    // total, or the widget overlay obscured mid-tick. Reject the insert
+    // instead of making the public counter visibly go backwards.
+    //
+    // We compare against the last row in counter_readings regardless of
+    // source so a manual admin override also sets a floor — the admin
+    // can still lower the counter by a second override if needed, but
+    // OCR alone cannot pull it down.
+    const latest = getLatestCounter();
+    if (latest && sum < latest.amount_pln) {
+      console.warn(
+        `[frame] rejecting decreasing sum: ${sum.toFixed(0)} < last ${latest.amount_pln.toFixed(0)}`,
+      );
+      return NextResponse.json({
+        saved: true,
+        ocr: "rejected — sum lower than last",
+        attempted: sum,
+        previousAmount: latest.amount_pln,
+        perRegion,
+      });
+    }
+
     const note =
       "home-relay " +
       contributing
