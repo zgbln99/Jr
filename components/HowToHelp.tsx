@@ -1,6 +1,9 @@
 import { Section } from "./Section";
+import { ShareButtons } from "./ShareButtons";
 
 type Donation = { url: string; label: string };
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://jrjr.pl";
 
 export function HowToHelp({ donations }: { donations: Donation[] }) {
   return (
@@ -58,30 +61,7 @@ export function HowToHelp({ donations }: { donations: Donation[] }) {
             Wrzuć na stories, wyślij znajomym, dodaj do bio. Każdy nowy widz to
             realna pomoc.
           </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <a
-              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                "Łatwogang x Bedoes x Cancer Fighters — 9 dni transmisji na rzecz dzieci chorych na raka. Dołącz:",
-              )}&url=${encodeURIComponent("https://jrjr.pl")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center h-9 px-3 rounded-[4px] border border-stripe-purple-light text-stripe-purple text-[13px] hover:bg-stripe-purple/5"
-            >
-              Wrzuć na X
-            </a>
-            <a
-              href="https://jrjr.pl"
-              onClick={(e) => {
-                e.preventDefault();
-                if (typeof navigator !== "undefined" && "clipboard" in navigator) {
-                  navigator.clipboard.writeText("https://jrjr.pl");
-                }
-              }}
-              className="inline-flex items-center h-9 px-3 rounded-[4px] border border-stripe-purple-light text-stripe-purple text-[13px] hover:bg-stripe-purple/5"
-            >
-              Skopiuj link
-            </a>
-          </div>
+          <ShareButtons url={SITE_URL} />
         </article>
 
         <article className="rounded-[8px] border border-stripe-border bg-white p-7 shadow-stripe-soft">
