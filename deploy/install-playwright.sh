@@ -31,10 +31,14 @@ echo "[playwright] installing system libs Chromium needs"
 cd "$APP_DIR"
 npx --yes playwright install-deps chromium
 
-echo "[playwright] downloading Chromium binary"
-# Binary goes into the jrjr user's cache, not into node_modules. Keeps
-# the browser version pinned to the playwright library version.
-sudo -u "$SERVICE_USER" -H bash -c "cd $APP_DIR && npx --yes playwright install chromium"
+echo "[playwright] downloading Chromium binaries"
+# Both the full Chromium AND chrome-headless-shell variants. Playwright
+# 1.49+ with `headless: true` launches chrome-headless-shell by default
+# — if that binary is missing you get a cryptic "Executable doesn't
+# exist" pointing at .cache/ms-playwright/chromium_headless_shell-XXXX.
+# Pulling both variants is ~350 MB total, cheap on an 8 GB VPS.
+sudo -u "$SERVICE_USER" -H bash -c \
+  "cd $APP_DIR && npx --yes playwright install chromium chromium-headless-shell"
 
 echo "[playwright] smoke test"
 sudo -u "$SERVICE_USER" -H bash -c "cd $APP_DIR && node -e \"
