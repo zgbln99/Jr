@@ -11,12 +11,24 @@ type Region = {
   height: number;
   enabled: 0 | 1;
   sort_order: number;
+  last_amount: number | null;
+  last_parsed_at: number | null;
   created_at: number;
   updated_at: number;
 };
 
+type TestRegion = {
+  id: number;
+  name: string | null;
+  amounts: number[];
+  text: string;
+  pickedAmount: number | null;
+  usedAmount: number | null;
+  source: "fresh" | "cached" | "missing";
+};
+
 type TestResult = {
-  regions: Array<{ id: number; name: string | null; amounts: number[]; text: string }>;
+  regions: TestRegion[];
   sum: number;
   engine: string;
 };
@@ -35,7 +47,7 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
   const [regions, setRegions] = useState<Region[]>(initial);
   const [frameUrl, setFrameUrl] = useState<string>(`/api/admin/ocr/frame?t=${Date.now()}`);
   const [frameMissing, setFrameMissing] = useState<boolean>(false);
-  const [busy, setBusy] = useState<"refresh" | "test" | null>(null);
+  const [busy, setBusy] = useState<"refresh" | "test" | "wipe" | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
@@ -56,13 +68,20 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
       }
       setFrameUrl(`/api/admin/ocr/frame?t=${Date.now()}`);
       setFrameMissing(false);
-      setStatus("Pobrano świeżą klatkę ze streamu.");
+      setStatus("Pobrano świeżą klatkę.");
     } catch (err) {
       setStatus(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(null);
     }
   }, []);
+
+  // Just reload the cached frame (latest upload from home-relay) without
+  // forcing a fresh stream pull on the VPS.
+  function reloadFrame() {
+    setFrameUrl(`/api/admin/ocr/frame?t=${Date.now()}`);
+    setFrameMissing(false);
+  }
 
   async function saveRegion(rect: { x: number; y: number; width: number; height: number }) {
     const res = await fetch("/api/admin/ocr/regions", {
@@ -76,7 +95,7 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
     }
     const created = (await res.json()) as Region;
     setRegions((rs) => [...rs, created]);
-    setStatus(`Dodano obszar #${created.id}. Kliknij 'Test OCR' żeby sprawdzić.`);
+    setStatus(`Dodano obszar #${created.id}. Kliknij „Test OCR" żeby sprawdzić.`);
   }
 
   async function patchRegion(id: number, patch: Partial<Region>) {
@@ -94,13 +113,31 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
   }
 
   async function removeRegion(id: number) {
-    if (!confirm("Usunąć ten obszar?")) return;
+    if (!confirm(`Usunąć obszar #${id}?`)) return;
     const res = await fetch(`/api/admin/ocr/regions/${id}`, { method: "DELETE" });
     if (!res.ok) {
       setStatus("Nie udało się usunąć");
       return;
     }
     setRegions((rs) => rs.filter((r) => r.id !== id));
+  }
+
+  async function removeAll() {
+    if (regions.length === 0) return;
+    if (!confirm(`Usunąć WSZYSTKIE ${regions.length} obszary? Tej operacji nie można cofnąć.`)) return;
+    setBusy("wipe");
+    try {
+      await Promise.all(
+        regions.map((r) =>
+          fetch(`/api/admin/ocr/regions/${r.id}`, { method: "DELETE" }),
+        ),
+      );
+      setRegions([]);
+      setTestResult(null);
+      setStatus("Skasowano wszystkie obszary. Narysuj nowe.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function runTest() {
@@ -150,7 +187,6 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
     const d = draft;
     dragStart.current = null;
     setDraft(null);
-    // Too small = accidental click, ignore.
     if (!d || d.width < 0.01 || d.height < 0.01) return;
     saveRegion(d);
   }
@@ -174,43 +210,57 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
     };
   }, [frameUrl]);
 
-  const resultByRegionId = new Map<number, TestResult["regions"][number]>();
+  const resultByRegionId = new Map<number, TestRegion>();
   if (testResult) for (const r of testResult.regions) resultByRegionId.set(r.id, r);
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[6px] border border-stripe-border bg-white p-6">
+      <div className="rounded-[6px] border border-black/10 bg-white p-6">
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <button
             onClick={refreshFrame}
             disabled={busy !== null}
-            className="inline-flex items-center h-10 px-4 rounded-[4px] bg-stripe-purple text-white text-[14px] hover:bg-stripe-purple-hover disabled:opacity-60"
+            className="inline-flex items-center h-10 px-4 rounded-[2px] bg-vf-red text-white text-[13px] font-bold uppercase tracking-wider hover:bg-[#b80000] disabled:opacity-60"
           >
             {busy === "refresh" ? "Pobieram…" : "Pobierz świeżą klatkę"}
           </button>
           <button
+            onClick={reloadFrame}
+            className="inline-flex items-center h-10 px-4 rounded-[2px] border border-vf-form/40 text-vf-form text-[13px] font-bold uppercase tracking-wider hover:bg-vf-neutral"
+            title="Przeładuj ostatnio przesłaną klatkę z relay-a (bez ponownego ściągania ze streamu)"
+          >
+            Odśwież obrazek
+          </button>
+          <button
             onClick={runTest}
             disabled={busy !== null || regions.length === 0}
-            className="inline-flex items-center h-10 px-4 rounded-[4px] border border-stripe-purple-light text-stripe-purple text-[14px] hover:bg-stripe-purple/5 disabled:opacity-60"
+            className="inline-flex items-center h-10 px-4 rounded-[2px] border border-vf-red text-vf-red text-[13px] font-bold uppercase tracking-wider hover:bg-vf-red/5 disabled:opacity-60"
           >
-            {busy === "test" ? "Testuję…" : `Test OCR (${regions.length} obszar${regions.length === 1 ? "" : "y"})`}
+            {busy === "test" ? "Testuję…" : `Test OCR (${regions.length})`}
+          </button>
+          <button
+            onClick={removeAll}
+            disabled={busy !== null || regions.length === 0}
+            className="inline-flex items-center h-10 px-4 rounded-[2px] border border-vf-form/40 text-vf-form text-[13px] font-bold uppercase tracking-wider hover:bg-vf-neutral disabled:opacity-50 ml-auto"
+          >
+            {busy === "wipe" ? "Kasuję…" : `Usuń wszystkie (${regions.length})`}
           </button>
           {testResult ? (
-            <span className="text-[13px] text-stripe-body">
-              Silnik: <strong className="text-stripe-navy">{testResult.engine}</strong> ·
-              suma: <strong className="text-stripe-navy tnum">{formatPLN(testResult.sum)}</strong>
+            <span className="basis-full text-[13px] text-vf-body">
+              Silnik: <strong className="text-vf-charcoal">{testResult.engine}</strong> · suma:{" "}
+              <strong className="text-vf-charcoal tnum">{formatPLN(testResult.sum)}</strong>
             </span>
           ) : null}
         </div>
 
-        <p className="text-[13px] text-stripe-body mb-3">
+        <p className="text-[13px] text-vf-body mb-3">
           Narysuj myszką prostokąty nad kwotami, które chcesz sumować. Worker
           OCR-uje każdy z nich osobno i dodaje do siebie. Kliknięcie bez
-          przeciągnięcia (rozmiar {"<"} 1%) jest ignorowane.
+          przeciągnięcia (rozmiar &lt; 1%) jest ignorowane.
         </p>
 
         <div
-          className="relative inline-block w-full max-w-[1100px] border border-stripe-border bg-stripe-dark-navy rounded-[4px] overflow-hidden select-none"
+          className="relative inline-block w-full max-w-[1200px] border border-black/10 bg-vf-charcoal rounded-[4px] overflow-hidden select-none"
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
@@ -222,8 +272,7 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
         >
           {frameMissing ? (
             <div className="aspect-video flex items-center justify-center text-white/60 text-[13px] p-8 text-center">
-              Brak klatki. Kliknij „Pobierz świeżą klatkę" — worker potrzebuje
-              yt-dlp + ffmpeg + cookies YouTube w <code>.env</code>.
+              Brak klatki. Odpal home-relay na PC, lub kliknij „Pobierz świeżą klatkę".
             </div>
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
@@ -238,35 +287,63 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
 
           {imgSize ? (
             <>
-              {regions.map((r) => (
-                <div
-                  key={r.id}
-                  className={`absolute border-2 ${
-                    r.enabled
-                      ? "border-stripe-success bg-stripe-success/10"
-                      : "border-stripe-body/50 bg-stripe-body/10"
-                  }`}
-                  style={{
-                    left: `${r.x * 100}%`,
-                    top: `${r.y * 100}%`,
-                    width: `${r.width * 100}%`,
-                    height: `${r.height * 100}%`,
-                  }}
-                >
-                  <span className="absolute -top-5 left-0 px-1 text-[10px] bg-stripe-success text-white rounded-[2px]">
-                    #{r.id}
-                    {r.name ? ` · ${r.name}` : ""}
-                  </span>
-                </div>
-              ))}
+              {regions.map((r) => {
+                const t = resultByRegionId.get(r.id);
+                const ok = t?.source === "fresh";
+                const cached = t?.source === "cached";
+                const missing = t?.source === "missing";
+                let borderColor = "#22c55e"; // active default green
+                let bgColor = "rgba(34,197,94,0.12)";
+                if (!r.enabled) {
+                  borderColor = "#9ca3af";
+                  bgColor = "rgba(156,163,175,0.10)";
+                } else if (ok) {
+                  borderColor = "#22c55e";
+                  bgColor = "rgba(34,197,94,0.16)";
+                } else if (cached) {
+                  borderColor = "#f59e0b";
+                  bgColor = "rgba(245,158,11,0.18)";
+                } else if (missing) {
+                  borderColor = "#e60000";
+                  bgColor = "rgba(230,0,0,0.18)";
+                }
+                return (
+                  <div
+                    key={r.id}
+                    className="absolute"
+                    style={{
+                      left: `${r.x * 100}%`,
+                      top: `${r.y * 100}%`,
+                      width: `${r.width * 100}%`,
+                      height: `${r.height * 100}%`,
+                      border: `2px solid ${borderColor}`,
+                      background: bgColor,
+                    }}
+                  >
+                    <span
+                      className="absolute -top-6 left-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-[2px] text-white"
+                      style={{ background: borderColor }}
+                    >
+                      #{r.id}
+                      {r.name ? ` · ${r.name}` : ""}
+                      {!r.enabled ? " · OFF" : ""}
+                      {t?.usedAmount != null
+                        ? ` · ${Math.round(t.usedAmount).toLocaleString("pl-PL")}`
+                        : ""}
+                    </span>
+                  </div>
+                );
+              })}
               {draft ? (
                 <div
-                  className="absolute border-2 border-stripe-ruby bg-stripe-ruby/15 pointer-events-none"
+                  className="absolute pointer-events-none"
                   style={{
                     left: `${draft.x * 100}%`,
                     top: `${draft.y * 100}%`,
                     width: `${draft.width * 100}%`,
                     height: `${draft.height * 100}%`,
+                    border: "2px dashed #e60000",
+                    background: "rgba(230,0,0,0.15)",
                   }}
                 />
               ) : null}
@@ -275,96 +352,129 @@ export function OcrCalibration({ initial }: { initial: Region[] }) {
         </div>
 
         {status ? (
-          <p className="mt-3 text-[13px] text-stripe-body">{status}</p>
+          <p className="mt-3 text-[13px] text-vf-charcoal">{status}</p>
         ) : null}
+
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-vf-body uppercase tracking-wider">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-[2px]" style={{ background: "#22c55e" }} />
+            zielony = świeży OCR
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-[2px]" style={{ background: "#f59e0b" }} />
+            żółty = z pamięci (last_amount)
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-[2px]" style={{ background: "#e60000" }} />
+            czerwony = nic nie odczytał i brak pamięci
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-[2px]" style={{ background: "#9ca3af" }} />
+            szary = wyłączony
+          </span>
+        </div>
       </div>
 
-      <div className="rounded-[6px] border border-stripe-border bg-white p-6">
-        <h3 className="text-[16px] text-stripe-navy mb-4">
+      <div className="rounded-[6px] border border-black/10 bg-white p-6">
+        <h3 className="text-[18px] font-bold text-vf-charcoal mb-4">
           Obszary ({regions.length})
         </h3>
         {regions.length === 0 ? (
-          <p className="text-[13px] text-stripe-body">
+          <p className="text-[13px] text-vf-body">
             Jeszcze nie ma obszarów. Narysuj pierwszy prostokąt na klatce wyżej.
           </p>
         ) : (
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-left text-stripe-label border-b border-stripe-border">
-                <th className="py-2 pr-3 font-normal">#</th>
-                <th className="py-2 pr-3 font-normal">Nazwa</th>
-                <th className="py-2 pr-3 font-normal">x / y / w / h</th>
-                <th className="py-2 pr-3 font-normal">Status</th>
-                <th className="py-2 pr-3 font-normal">Ostatni test OCR</th>
-                <th className="py-2 pr-3 font-normal"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {regions.map((r) => {
-                const t = resultByRegionId.get(r.id);
-                return (
-                  <tr key={r.id} className="border-b border-stripe-border/60 align-top">
-                    <td className="py-2 pr-3 text-stripe-body tnum">{r.id}</td>
-                    <td className="py-2 pr-3">
-                      <input
-                        defaultValue={r.name ?? ""}
-                        placeholder="opcjonalna nazwa"
-                        onBlur={(e) =>
-                          e.target.value !== (r.name ?? "")
-                            ? patchRegion(r.id, { name: e.target.value || null } as Partial<Region>)
-                            : undefined
-                        }
-                        className="w-full h-8 px-2 rounded-[4px] border border-stripe-border text-[13px] focus:border-stripe-purple focus:outline-none"
-                      />
-                    </td>
-                    <td className="py-2 pr-3 text-stripe-body tnum">
-                      {`${(r.x * 100).toFixed(1)}% / ${(r.y * 100).toFixed(1)}% / ${(
-                        r.width * 100
-                      ).toFixed(1)}% / ${(r.height * 100).toFixed(1)}%`}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <label className="inline-flex items-center gap-2 text-[13px]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="text-left text-vf-form border-b border-black/10">
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">#</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Nazwa</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Pozycja</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Aktywny</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Cache</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider">Ostatni test</th>
+                  <th className="py-2 pr-3 font-bold uppercase tracking-wider"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {regions.map((r) => {
+                  const t = resultByRegionId.get(r.id);
+                  return (
+                    <tr key={r.id} className="border-b border-black/5 align-top">
+                      <td className="py-2 pr-3 text-vf-body tnum">{r.id}</td>
+                      <td className="py-2 pr-3">
                         <input
-                          type="checkbox"
-                          checked={!!r.enabled}
-                          onChange={(e) =>
-                            patchRegion(r.id, {
-                              enabled: e.target.checked ? 1 : 0,
-                            } as Partial<Region>)
+                          defaultValue={r.name ?? ""}
+                          placeholder="np. tipply"
+                          onBlur={(e) =>
+                            e.target.value !== (r.name ?? "")
+                              ? patchRegion(r.id, { name: e.target.value || null } as Partial<Region>)
+                              : undefined
                           }
+                          className="w-full h-8 px-2 rounded-[2px] border border-vf-form/30 text-[13px] focus:border-vf-red focus:outline-none"
                         />
-                        Aktywny
-                      </label>
-                    </td>
-                    <td className="py-2 pr-3 text-stripe-body max-w-[280px]">
-                      {t ? (
-                        <div>
-                          <div className="tnum text-stripe-navy">
-                            {t.amounts.length
-                              ? t.amounts.map((n) => formatPLN(n)).join(", ")
-                              : "—"}
+                      </td>
+                      <td className="py-2 pr-3 text-vf-body tnum text-[12px]">
+                        {`${(r.x * 100).toFixed(1)}% / ${(r.y * 100).toFixed(1)}% / ${(r.width * 100).toFixed(1)}% × ${(r.height * 100).toFixed(1)}%`}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <label className="inline-flex items-center gap-2 text-[13px]">
+                          <input
+                            type="checkbox"
+                            checked={!!r.enabled}
+                            onChange={(e) =>
+                              patchRegion(r.id, {
+                                enabled: e.target.checked ? 1 : 0,
+                              } as Partial<Region>)
+                            }
+                          />
+                          {r.enabled ? "tak" : "nie"}
+                        </label>
+                      </td>
+                      <td className="py-2 pr-3 text-vf-body tnum text-[12px]">
+                        {r.last_amount != null ? formatPLN(r.last_amount) : "—"}
+                      </td>
+                      <td className="py-2 pr-3 text-vf-body max-w-[280px]">
+                        {t ? (
+                          <div>
+                            <div
+                              className="tnum text-[13px] font-bold"
+                              style={{
+                                color:
+                                  t.source === "fresh"
+                                    ? "#16a34a"
+                                    : t.source === "cached"
+                                      ? "#d97706"
+                                      : "#dc2626",
+                              }}
+                            >
+                              {t.usedAmount != null
+                                ? `${formatPLN(t.usedAmount)} (${t.source})`
+                                : "— (missing)"}
+                            </div>
+                            <div className="text-[11px] text-vf-body/70 line-clamp-2">
+                              raw: {t.text || "(pusto)"}
+                            </div>
                           </div>
-                          <div className="text-[11px] text-stripe-body/80 line-clamp-2">
-                            {t.text}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-stripe-body/50">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <button
-                        onClick={() => removeRegion(r.id)}
-                        className="text-stripe-ruby hover:underline"
-                      >
-                        Usuń
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        ) : (
+                          <span className="text-vf-body/50">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <button
+                          onClick={() => removeRegion(r.id)}
+                          className="text-vf-red hover:underline font-bold uppercase tracking-wider text-[12px]"
+                        >
+                          Usuń
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
