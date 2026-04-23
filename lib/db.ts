@@ -67,6 +67,22 @@ function migrate(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_media_mentions_sort
       ON media_mentions (sort_order, published_at DESC, id DESC);
+
+    CREATE TABLE IF NOT EXISTS ocr_regions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      x REAL NOT NULL,
+      y REAL NOT NULL,
+      width REAL NOT NULL,
+      height REAL NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ocr_regions_sort
+      ON ocr_regions (enabled DESC, sort_order ASC, id ASC);
   `);
 
   const seedSetting = db.prepare(`
@@ -339,4 +355,93 @@ export function updateMedia(
 
 export function deleteMedia(id: number) {
   getDb().prepare("DELETE FROM media_mentions WHERE id = ?").run(id);
+}
+
+// ---- OCR regions ----
+
+export type OcrRegion = {
+  id: number;
+  name: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  enabled: 0 | 1;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export function listRegions(): OcrRegion[] {
+  return getDb()
+    .prepare(
+      `SELECT * FROM ocr_regions
+       ORDER BY enabled DESC, sort_order ASC, id ASC`,
+    )
+    .all() as OcrRegion[];
+}
+
+export function listEnabledRegions(): OcrRegion[] {
+  return getDb()
+    .prepare(
+      `SELECT * FROM ocr_regions
+       WHERE enabled = 1
+       ORDER BY sort_order ASC, id ASC`,
+    )
+    .all() as OcrRegion[];
+}
+
+export function createRegion(
+  input: Omit<OcrRegion, "id" | "created_at" | "updated_at">,
+): OcrRegion {
+  const now = Date.now();
+  const info = getDb()
+    .prepare(
+      `INSERT INTO ocr_regions (name, x, y, width, height, enabled, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      input.name,
+      input.x,
+      input.y,
+      input.width,
+      input.height,
+      input.enabled,
+      input.sort_order,
+      now,
+      now,
+    );
+  return { id: Number(info.lastInsertRowid), ...input, created_at: now, updated_at: now };
+}
+
+export function updateRegion(
+  id: number,
+  patch: Partial<Omit<OcrRegion, "id" | "created_at">>,
+) {
+  const current = getDb()
+    .prepare("SELECT * FROM ocr_regions WHERE id = ?")
+    .get(id) as OcrRegion | undefined;
+  if (!current) return null;
+  const next: OcrRegion = { ...current, ...patch, updated_at: Date.now() };
+  getDb()
+    .prepare(
+      `UPDATE ocr_regions SET name = ?, x = ?, y = ?, width = ?, height = ?, enabled = ?, sort_order = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .run(
+      next.name,
+      next.x,
+      next.y,
+      next.width,
+      next.height,
+      next.enabled,
+      next.sort_order,
+      next.updated_at,
+      id,
+    );
+  return next;
+}
+
+export function deleteRegion(id: number) {
+  getDb().prepare("DELETE FROM ocr_regions WHERE id = ?").run(id);
 }

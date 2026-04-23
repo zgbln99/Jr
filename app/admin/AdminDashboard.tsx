@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CounterReading, Guest, MediaMention } from "@/lib/db";
+import type { CounterReading, Guest, MediaMention, OcrRegion } from "@/lib/db";
 import { normalizePhotoUrl } from "@/lib/media";
 import { formatWarsawLabel } from "@/lib/time";
+import { OcrCalibration } from "@/components/OcrCalibration";
 
 type Props = {
   settings: Record<string, string>;
   guests: Guest[];
   media: MediaMention[];
+  regions: OcrRegion[];
   latest: CounterReading | null;
   latestOcr: CounterReading | null;
 };
@@ -30,10 +32,17 @@ function formatDateTime(ts: number | null | undefined): string {
   }).format(new Date(ts));
 }
 
-export function AdminDashboard({ settings, guests, media, latest, latestOcr }: Props) {
+export function AdminDashboard({
+  settings,
+  guests,
+  media,
+  regions,
+  latest,
+  latestOcr,
+}: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<
-    "counter" | "content" | "guests" | "links" | "media"
+    "counter" | "content" | "guests" | "links" | "media" | "ocr"
   >("counter");
 
   async function logout() {
@@ -83,6 +92,7 @@ export function AdminDashboard({ settings, guests, media, latest, latestOcr }: P
           {(
             [
               ["counter", "Licznik"],
+              ["ocr", "Kalibracja OCR"],
               ["links", "Linki i countdown"],
               ["content", "Treść"],
               ["guests", "Goście"],
@@ -110,6 +120,7 @@ export function AdminDashboard({ settings, guests, media, latest, latestOcr }: P
         {tab === "content" ? <ContentTab settings={settings} /> : null}
         {tab === "guests" ? <GuestsTab initial={guests} /> : null}
         {tab === "media" ? <MediaTab initial={media} /> : null}
+        {tab === "ocr" ? <OcrCalibration initial={regions} /> : null}
       </div>
     </div>
   );

@@ -60,6 +60,20 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_media_mentions_sort
     ON media_mentions (sort_order, published_at DESC, id DESC);
+  CREATE TABLE IF NOT EXISTS ocr_regions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    x REAL NOT NULL,
+    y REAL NOT NULL,
+    width REAL NOT NULL,
+    height REAL NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_ocr_regions_sort
+    ON ocr_regions (enabled DESC, sort_order ASC, id ASC);
 `);
 
 console.log(`[db] initialized at ${DB_PATH}`);

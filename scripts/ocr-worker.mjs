@@ -20,9 +20,17 @@
 //   the frame, 0..1). Defaults cover the whole left third / bottom third.
 
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  readFileSync,
+  copyFileSync,
+  mkdirSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import Database from "better-sqlite3";
 
 // -------- Config --------
 const STREAM_URL =
@@ -32,16 +40,42 @@ const ENGINE = (process.env.OCR_ENGINE || "paddle").toLowerCase();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://127.0.0.1:3000";
 const INTERNAL_TOKEN = process.env.SESSION_SECRET;
 
-// Crop region = the donation widget overlay on the left side of the frame.
-// The widget holds two counters we need:
-//   * a green "live ticker" amount at the top (e.g. "247 454 zł")
-//   * a red progress bar with the cumulative total (e.g. "5 851 146,29 zł")
-// Values are fractions of width/height (0..1). Defaults cover roughly the
-// left 55% width and lower 60% height — tune in .env if the overlay moves.
+// Crop region — fallback used only when ocr_regions table is empty.
+// Once admin draws regions in /admin → Kalibracja OCR, these env vars are
+// ignored and the worker loops over every enabled region, summing them all.
 const CROP_X = clamp01(Number(process.env.CROP_X ?? 0));
 const CROP_Y = clamp01(Number(process.env.CROP_Y ?? 0.4));
 const CROP_W = clamp01(Number(process.env.CROP_W ?? 0.55));
 const CROP_H = clamp01(Number(process.env.CROP_H ?? 0.6));
+
+// Where to stash the most recent captured frame so the admin UI can show
+// it for region calibration.
+const LAST_FRAME_PATH = resolve(
+  process.cwd(),
+  process.env.LAST_FRAME_PATH || "./data/last-frame.jpg",
+);
+
+// Read-only handle on the site DB so we can pick up admin-drawn regions.
+const DB_PATH = resolve(process.cwd(), process.env.DATABASE_PATH || "./data/jrjr.db");
+let _db;
+function db() {
+  if (!_db) _db = new Database(DB_PATH, { readonly: true, fileMustExist: false });
+  return _db;
+}
+
+function loadEnabledRegions() {
+  try {
+    return db()
+      .prepare(
+        `SELECT id, name, x, y, width, height FROM ocr_regions
+         WHERE enabled = 1
+         ORDER BY sort_order ASC, id ASC`,
+      )
+      .all();
+  } catch {
+    return [];
+  }
+}
 
 function clamp01(n) {
   if (!Number.isFinite(n)) return 0;
@@ -79,18 +113,67 @@ async function tick() {
   const workDir = mkdtempSync(join(tmpdir(), "jrjr-ocr-"));
   try {
     const framePath = join(workDir, "frame.jpg");
-    const cropPath = join(workDir, "crop.png");
 
     await grabFrame(STREAM_URL, framePath);
-    await cropFrame(framePath, cropPath);
 
-    const text = await runOcr(cropPath);
-    console.log("[ocr] raw text:", text.replace(/\s+/g, " ").slice(0, 300));
+    // Mirror the frame into data/last-frame.jpg for the admin calibration UI.
+    try {
+      mkdirSync(dirname(LAST_FRAME_PATH), { recursive: true });
+      copyFileSync(framePath, LAST_FRAME_PATH);
+    } catch (err) {
+      console.warn("[ocr] could not save last-frame:", err.message);
+    }
 
-    const picked = pickCounterAmounts(text);
-    if (picked.length === 0) {
+    const regions = loadEnabledRegions();
+    /** @type {number[]} */
+    const allAmounts = [];
+
+    if (regions.length > 0) {
+      console.log(`[ocr] running against ${regions.length} admin-defined region(s)`);
+      for (const region of regions) {
+        const cropPath = join(workDir, `crop-r${region.id}.png`);
+        try {
+          await cropFrameRegion(framePath, cropPath, region);
+          const text = await runOcr(cropPath);
+          const amounts = extractAmounts(text);
+          const label = region.name || `region #${region.id}`;
+          console.log(
+            `[ocr]   ${label}: ${
+              amounts.length ? amounts.map((n) => n.toFixed(2)).join(", ") : "(no amounts)"
+            } — text: ${text.replace(/\s+/g, " ").slice(0, 120)}`,
+          );
+          allAmounts.push(...amounts);
+        } catch (err) {
+          console.warn(`[ocr]   region #${region.id} failed: ${err.message}`);
+        }
+      }
+    } else {
+      // Backward-compat: no admin regions yet, fall back to env-defined crop
+      // with the hardened goal-aware parser.
+      const cropPath = join(workDir, "crop.png");
+      await cropFrameRegion(framePath, cropPath, {
+        x: CROP_X,
+        y: CROP_Y,
+        width: CROP_W,
+        height: CROP_H,
+      });
+      const text = await runOcr(cropPath);
+      console.log("[ocr] (fallback) raw text:", text.replace(/\s+/g, " ").slice(0, 300));
+      allAmounts.push(...pickCounterAmounts(text));
+    }
+
+    if (allAmounts.length === 0) {
       console.warn("[ocr] no amounts parsed — skipping this tick");
       return;
+    }
+    // De-dup exact repeats (OCR can read the same number twice across regions)
+    const seen = new Set();
+    const picked = [];
+    for (const n of allAmounts) {
+      const key = Math.round(n * 100);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      picked.push(n);
     }
     const sum = picked.reduce((s, v) => s + v, 0);
     console.log(
@@ -156,9 +239,9 @@ async function grabFrame(streamUrl, outPath) {
   ]);
 }
 
-async function cropFrame(inPath, outPath) {
-  // Use ffmpeg to crop out the bottom-left region in one shot and upscale.
-  const filter = `crop=iw*${CROP_W}:ih*${CROP_H}:iw*${CROP_X}:ih*${CROP_Y},scale=iw*2:ih*2:flags=lanczos`;
+async function cropFrameRegion(inPath, outPath, region) {
+  const { x, y, width, height } = region;
+  const filter = `crop=iw*${width}:ih*${height}:iw*${x}:ih*${y},scale=iw*2:ih*2:flags=lanczos`;
   await run("ffmpeg", [
     "-hide_banner",
     "-loglevel", "error",
