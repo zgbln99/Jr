@@ -12,13 +12,21 @@ export function HowToHelp({ donations }: { donations: Donation[] }) {
     >
       <div className="grid md:grid-cols-3 gap-5">
         <article className="rounded-[8px] border border-stripe-border bg-white p-7 shadow-stripe-soft">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-stripe-purple">
-            Krok 1
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-stripe-purple">
+              Krok 1
+            </p>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-stripe-success/15 text-stripe-success-text text-[10px] uppercase tracking-wide border border-stripe-success/30">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Bez prowizji
+            </span>
+          </div>
           <h3 className="mt-2 text-stripe-navy font-light text-[22px]">Wpłać</h3>
           <p className="mt-3 text-stripe-body text-[15px] leading-relaxed">
-            Obie zrzutki są <strong>bez prowizji</strong> — 100% trafia do Fundacji
-            Cancer Fighters.
+            Obie zrzutki nie pobierają ani złotówki prowizji — <strong>100% Twojej wpłaty</strong> trafia do
+            Fundacji Cancer Fighters.
           </p>
           <div className="mt-5 flex flex-col gap-2">
             {donations.length === 0 ? (

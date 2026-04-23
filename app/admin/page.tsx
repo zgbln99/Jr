@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { getAllSettings, getLatestCounter, getLatestOcrCounter, listGuests } from "@/lib/db";
+import {
+  getAllSettings,
+  getLatestCounter,
+  getLatestOcrCounter,
+  listGuests,
+  listMedia,
+} from "@/lib/db";
 import { AdminDashboard } from "./AdminDashboard";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +19,7 @@ export default async function AdminPage() {
 
   const settings = getAllSettings();
   const guests = listGuests();
+  const media = listMedia();
   const latest = getLatestCounter();
   const latestOcr = getLatestOcrCounter();
 
@@ -20,6 +27,7 @@ export default async function AdminPage() {
     <AdminDashboard
       settings={settings}
       guests={guests}
+      media={media}
       latest={latest}
       latestOcr={latestOcr}
     />

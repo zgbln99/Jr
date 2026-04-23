@@ -47,6 +47,19 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_guests_status_sort
     ON guests (status, sort_order, appearance_date);
+  CREATE TABLE IF NOT EXISTS media_mentions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    outlet TEXT NOT NULL,
+    url TEXT NOT NULL,
+    image_url TEXT,
+    published_at TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_media_mentions_sort
+    ON media_mentions (sort_order, published_at DESC, id DESC);
 `);
 
 console.log(`[db] initialized at ${DB_PATH}`);

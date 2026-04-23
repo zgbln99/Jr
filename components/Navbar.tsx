@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { href: "#inicjatorzy", label: "Inicjatorzy" },
   { href: "#fundacja", label: "Fundacja" },
   { href: "#goscie", label: "Goście" },
+  { href: "#media", label: "Media" },
   { href: "#live", label: "Live" },
 ];
 

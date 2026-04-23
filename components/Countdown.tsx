@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { parseWarsawToMs } from "@/lib/time";
 
 type Parts = { days: number; hours: number; minutes: number; seconds: number };
 
@@ -16,7 +17,7 @@ function toParts(ms: number): Parts {
 }
 
 export function Countdown({ endsAt }: { endsAt: string | null }) {
-  const end = endsAt ? new Date(endsAt).getTime() : null;
+  const end = parseWarsawToMs(endsAt);
   const [now, setNow] = useState<number>(() => Date.now());
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export function Countdown({ endsAt }: { endsAt: string | null }) {
     return () => window.clearInterval(id);
   }, [end]);
 
-  if (!end || Number.isNaN(end)) return null;
+  if (end == null) return null;
   const parts = toParts(end - now);
   const finished = end - now <= 0;
 

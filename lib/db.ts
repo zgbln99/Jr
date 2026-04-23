@@ -52,6 +52,21 @@ function migrate(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_guests_status_sort
       ON guests (status, sort_order, appearance_date);
+
+    CREATE TABLE IF NOT EXISTS media_mentions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      outlet TEXT NOT NULL,
+      url TEXT NOT NULL,
+      image_url TEXT,
+      published_at TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_media_mentions_sort
+      ON media_mentions (sort_order, published_at DESC, id DESC);
   `);
 
   const seedSetting = db.prepare(`
@@ -246,4 +261,82 @@ export function updateGuest(id: number, patch: Partial<Omit<Guest, "id" | "creat
 
 export function deleteGuest(id: number) {
   getDb().prepare("DELETE FROM guests WHERE id = ?").run(id);
+}
+
+// ---- Media mentions ----
+
+export type MediaMention = {
+  id: number;
+  title: string;
+  outlet: string;
+  url: string;
+  image_url: string | null;
+  published_at: string | null;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export function listMedia(): MediaMention[] {
+  return getDb()
+    .prepare(
+      `SELECT * FROM media_mentions
+       ORDER BY sort_order ASC,
+                COALESCE(published_at, '0000') DESC,
+                id DESC`,
+    )
+    .all() as MediaMention[];
+}
+
+export function createMedia(
+  input: Omit<MediaMention, "id" | "created_at" | "updated_at">,
+): MediaMention {
+  const now = Date.now();
+  const info = getDb()
+    .prepare(
+      `INSERT INTO media_mentions (title, outlet, url, image_url, published_at, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      input.title,
+      input.outlet,
+      input.url,
+      input.image_url,
+      input.published_at,
+      input.sort_order,
+      now,
+      now,
+    );
+  return { id: Number(info.lastInsertRowid), ...input, created_at: now, updated_at: now };
+}
+
+export function updateMedia(
+  id: number,
+  patch: Partial<Omit<MediaMention, "id" | "created_at">>,
+) {
+  const current = getDb()
+    .prepare("SELECT * FROM media_mentions WHERE id = ?")
+    .get(id) as MediaMention | undefined;
+  if (!current) return null;
+  const next: MediaMention = { ...current, ...patch, updated_at: Date.now() };
+  getDb()
+    .prepare(
+      `UPDATE media_mentions SET title = ?, outlet = ?, url = ?, image_url = ?, published_at = ?, sort_order = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .run(
+      next.title,
+      next.outlet,
+      next.url,
+      next.image_url,
+      next.published_at,
+      next.sort_order,
+      next.updated_at,
+      id,
+    );
+  return next;
+}
+
+export function deleteMedia(id: number) {
+  getDb().prepare("DELETE FROM media_mentions WHERE id = ?").run(id);
 }

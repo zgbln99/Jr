@@ -2,6 +2,7 @@ import {
   getAllSettings,
   getLatestCounter,
   listGuests,
+  listMedia,
 } from "@/lib/db";
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
@@ -9,6 +10,7 @@ import { About } from "@/components/About";
 import { Initiators } from "@/components/Initiators";
 import { Foundation } from "@/components/Foundation";
 import { Guests } from "@/components/Guests";
+import { Media } from "@/components/Media";
 import { LiveEmbed } from "@/components/LiveEmbed";
 import { HowToHelp } from "@/components/HowToHelp";
 import { Footer } from "@/components/Footer";
@@ -37,6 +39,7 @@ export default function Home() {
   const settings = getAllSettings();
   const counterRow = getLatestCounter();
   const guests = listGuests();
+  const media = listMedia();
 
   const counter = {
     amount: counterRow?.amount_pln ?? 0,
@@ -78,6 +81,7 @@ export default function Home() {
           instagram={settings.cancerfighters_ig || undefined}
         />
         <Guests guests={guests} />
+        <Media items={media} />
         <LiveEmbed streamUrl={STREAM_URL} />
         <HowToHelp donations={donations} />
       </main>

@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CounterReading, Guest } from "@/lib/db";
+import type { CounterReading, Guest, MediaMention } from "@/lib/db";
 import { normalizePhotoUrl } from "@/lib/media";
+import { formatWarsawLabel } from "@/lib/time";
 
 type Props = {
   settings: Record<string, string>;
   guests: Guest[];
+  media: MediaMention[];
   latest: CounterReading | null;
   latestOcr: CounterReading | null;
 };
@@ -28,9 +30,11 @@ function formatDateTime(ts: number | null | undefined): string {
   }).format(new Date(ts));
 }
 
-export function AdminDashboard({ settings, guests, latest, latestOcr }: Props) {
+export function AdminDashboard({ settings, guests, media, latest, latestOcr }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"counter" | "content" | "guests" | "links">("counter");
+  const [tab, setTab] = useState<
+    "counter" | "content" | "guests" | "links" | "media"
+  >("counter");
 
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -75,13 +79,14 @@ export function AdminDashboard({ settings, guests, latest, latestOcr }: Props) {
           do zrzutek.
         </p>
 
-        <div className="flex gap-1 mb-8 border-b border-stripe-border">
+        <div className="flex gap-1 mb-8 border-b border-stripe-border overflow-x-auto">
           {(
             [
               ["counter", "Licznik"],
               ["links", "Linki i countdown"],
               ["content", "Treść"],
               ["guests", "Goście"],
+              ["media", "Media o akcji"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -104,6 +109,7 @@ export function AdminDashboard({ settings, guests, latest, latestOcr }: Props) {
         {tab === "links" ? <LinksTab settings={settings} /> : null}
         {tab === "content" ? <ContentTab settings={settings} /> : null}
         {tab === "guests" ? <GuestsTab initial={guests} /> : null}
+        {tab === "media" ? <MediaTab initial={media} /> : null}
       </div>
     </div>
   );
@@ -386,13 +392,18 @@ function LinksTab({ settings }: { settings: Record<string, string> }) {
 
         <Field
           label="Koniec transmisji (data i godzina)"
-          hint="Format: YYYY-MM-DDTHH:MM (np. 2026-05-02T21:00). Puste = ukryty countdown."
+          hint="Godzinę wpisujesz wg strefy Europe/Warsaw — countdown tyka do tego samego momentu w każdej strefie czasowej. Puste = ukryty countdown."
         >
           <Input
             type="datetime-local"
             value={state.stream_end_iso}
             onChange={(e) => setState({ ...state, stream_end_iso: e.target.value })}
           />
+          {state.stream_end_iso ? (
+            <span className="block text-[12px] text-stripe-success-text mt-1">
+              Tak to zrozumie site: {formatWarsawLabel(state.stream_end_iso) ?? "—"} (Warszawa)
+            </span>
+          ) : null}
         </Field>
         <Field label="Strona fundacji">
           <Input
@@ -747,6 +758,242 @@ function GuestsTab({ initial }: { initial: Guest[] }) {
                         </button>
                         <button
                           onClick={() => remove(g.id)}
+                          className="text-stripe-ruby hover:underline"
+                        >
+                          Usuń
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+// ---------------- Media tab ----------------
+
+function emptyMention(): Omit<MediaMention, "id" | "created_at" | "updated_at"> {
+  return {
+    title: "",
+    outlet: "",
+    url: "",
+    image_url: null,
+    published_at: null,
+    sort_order: 0,
+  };
+}
+
+function MediaTab({ initial }: { initial: MediaMention[] }) {
+  const [items, setItems] = useState<MediaMention[]>(initial);
+  const [draft, setDraft] = useState(emptyMention());
+  const [editId, setEditId] = useState<number | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const router = useRouter();
+
+  function draftFrom(item: MediaMention) {
+    const { id: _i, created_at: _c, updated_at: _u, ...rest } = item;
+    return rest;
+  }
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus(null);
+    const res = await fetch("/api/admin/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(draft),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setStatus(body.error || "Nie udało się dodać");
+      return;
+    }
+    const created = (await res.json()) as MediaMention;
+    setItems([...items, created]);
+    setDraft(emptyMention());
+    setStatus("Dodano.");
+    router.refresh();
+  }
+
+  async function update(e: React.FormEvent) {
+    e.preventDefault();
+    if (editId == null) return;
+    setStatus(null);
+    const res = await fetch(`/api/admin/media/${editId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(draft),
+    });
+    if (!res.ok) {
+      setStatus("Nie udało się zapisać");
+      return;
+    }
+    const updated = (await res.json()) as MediaMention;
+    setItems(items.map((m) => (m.id === updated.id ? updated : m)));
+    setDraft(emptyMention());
+    setEditId(null);
+    setStatus("Zapisano.");
+    router.refresh();
+  }
+
+  async function remove(id: number) {
+    if (!confirm("Usunąć ten wpis?")) return;
+    const res = await fetch(`/api/admin/media/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setStatus("Nie udało się usunąć");
+      return;
+    }
+    setItems(items.filter((m) => m.id !== id));
+    router.refresh();
+  }
+
+  return (
+    <>
+      <Card
+        title={editId == null ? "Dodaj artykuł / materiał" : "Edytuj wpis"}
+        description="Linki do artykułów, odcinków, filmów czy wątków, które mówią o akcji. Kolejność sortowania: mniejsza liczba = wyżej."
+      >
+        <form
+          onSubmit={editId == null ? create : update}
+          className="grid md:grid-cols-2 gap-4"
+        >
+          <Field label="Redakcja / kanał" hint="np. Noizz, Gazeta Wyborcza, TVN24, Kanał Zero">
+            <Input
+              required
+              value={draft.outlet}
+              onChange={(e) => setDraft({ ...draft, outlet: e.target.value })}
+            />
+          </Field>
+          <Field label="Link (URL)">
+            <Input
+              required
+              type="url"
+              value={draft.url}
+              onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+              placeholder="https://..."
+            />
+          </Field>
+          <Field label="Tytuł artykułu / materiału" hint="Zostanie pokazany na karcie">
+            <Input
+              required
+              value={draft.title}
+              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            />
+          </Field>
+          <Field label="Data publikacji" hint="YYYY-MM-DD (opcjonalnie)">
+            <Input
+              type="date"
+              value={draft.published_at ?? ""}
+              onChange={(e) => setDraft({ ...draft, published_at: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Grafika (URL, opcjonalnie)"
+            hint="Zdjęcie/miniaturka. Dropbox też działa — zamienimy na raw."
+          >
+            <Input
+              value={draft.image_url ?? ""}
+              onChange={(e) => setDraft({ ...draft, image_url: e.target.value })}
+              placeholder="https://..."
+            />
+            {draft.image_url ? (
+              <div className="mt-2 flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={normalizePhotoUrl(draft.image_url) ?? ""}
+                  alt="podgląd"
+                  className="h-16 w-24 rounded-[4px] object-cover border border-stripe-border bg-stripe-purple-soft"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.opacity = "0.2";
+                  }}
+                />
+              </div>
+            ) : null}
+          </Field>
+          <Field label="Kolejność sortowania">
+            <Input
+              type="number"
+              value={draft.sort_order}
+              onChange={(e) =>
+                setDraft({ ...draft, sort_order: Number.parseInt(e.target.value, 10) || 0 })
+              }
+            />
+          </Field>
+          <div className="md:col-span-2 flex items-center gap-3">
+            <PrimaryButton type="submit">
+              {editId == null ? "Dodaj" : "Zapisz zmiany"}
+            </PrimaryButton>
+            {editId != null ? (
+              <GhostButton
+                type="button"
+                onClick={() => {
+                  setEditId(null);
+                  setDraft(emptyMention());
+                }}
+              >
+                Anuluj
+              </GhostButton>
+            ) : null}
+            <StatusToast message={status} />
+          </div>
+        </form>
+      </Card>
+
+      <Card title={`Lista wpisów (${items.length})`}>
+        {items.length === 0 ? (
+          <p className="text-[14px] text-stripe-body">
+            Jeszcze nic. Wrzuć pierwszy link do artykułu, gdy tylko pojawi się
+            pierwsze medium o akcji.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="text-left text-stripe-label border-b border-stripe-border">
+                  <th className="py-2 pr-4 font-normal">Redakcja</th>
+                  <th className="py-2 pr-4 font-normal">Tytuł</th>
+                  <th className="py-2 pr-4 font-normal">Data</th>
+                  <th className="py-2 pr-4 font-normal">Link</th>
+                  <th className="py-2 pr-4 font-normal">Sort</th>
+                  <th className="py-2 pr-4 font-normal"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((m) => (
+                  <tr key={m.id} className="border-b border-stripe-border/60">
+                    <td className="py-2 pr-4 text-stripe-navy">{m.outlet}</td>
+                    <td className="py-2 pr-4 text-stripe-body truncate max-w-[320px]">{m.title}</td>
+                    <td className="py-2 pr-4 text-stripe-body tnum">{m.published_at ?? "—"}</td>
+                    <td className="py-2 pr-4 text-stripe-body truncate max-w-[220px]">
+                      <a
+                        className="text-stripe-purple"
+                        href={m.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {m.url}
+                      </a>
+                    </td>
+                    <td className="py-2 pr-4 tnum text-stripe-body">{m.sort_order}</td>
+                    <td className="py-2 pr-4">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setDraft(draftFrom(m));
+                            setEditId(m.id);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                          className="text-stripe-purple hover:text-stripe-purple-hover"
+                        >
+                          Edytuj
+                        </button>
+                        <button
+                          onClick={() => remove(m.id)}
                           className="text-stripe-ruby hover:underline"
                         >
                           Usuń

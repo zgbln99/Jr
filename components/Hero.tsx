@@ -103,6 +103,29 @@ export function Hero({
               </svg>
             </a>
           </div>
+
+          <p className="flex items-center gap-2 text-white/80 text-[13px]">
+            <svg
+              aria-hidden
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="text-stripe-success"
+            >
+              <path
+                d="M3 8.5l3 3 7-7"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>
+              <strong className="text-white font-normal">100% bez prowizji</strong>
+              <span className="text-white/60"> — każda złotówka trafia do Fundacji Cancer Fighters</span>
+            </span>
+          </p>
         </div>
       </div>
     </section>
