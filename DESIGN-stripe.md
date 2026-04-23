@@ -1,322 +1,423 @@
-# Design System Inspired by Stripe
+# Design System Inspired by Vodafone
 
 ## 1. Visual Theme & Atmosphere
 
-Stripe's website is the gold standard of fintech design -- a system that manages to feel simultaneously technical and luxurious, precise and warm. The page opens on a clean white canvas (`#ffffff`) with deep navy headings (`#061b31`) and a signature purple (`#533afd`) that functions as both brand anchor and interactive accent. This isn't the cold, clinical purple of enterprise software; it's a rich, saturated violet that reads as confident and premium. The overall impression is of a financial institution redesigned by a world-class type foundry.
+Vodafone's corporate web system carries the confident, broadcast-scale presence of a global telecom brand — built around a single, fiercely-owned brand red and a restrained, editorial layout that lets imagery and type carry the emotional weight. Every page opens the same way: a cinematic dark hero image behind a towering, tight-tracked uppercase display headline ("EVERYONE. CONNECTED.", "INVESTORS", "OUR BUSINESS") followed by a deep red full-width band that acts as a chapter break, then a crisp white editorial grid or a near-black section reserved for institutional content (share ticker, global map, ESG data). The voice is institutional but human: warm documentary photography — cable-laying crews, coral reefs, pine forests, urban twilight — photographed with color-graded realism and set against clean neutral surfaces that never compete with the content.
 
-The custom `sohne-var` variable font is the defining element of Stripe's visual identity. Every text element enables the OpenType `"ss01"` stylistic set, which modifies character shapes for a distinctly geometric, modern feel. At display sizes (48px-56px), sohne-var runs at weight 300 -- an extraordinarily light weight for headlines that creates an ethereal, almost whispered authority. This is the opposite of the "bold hero headline" convention; Stripe's headlines feel like they don't need to shout. The negative letter-spacing (-1.4px at 56px, -0.96px at 48px) tightens the text into dense, engineered blocks. At smaller sizes, the system also uses weight 300 with proportionally reduced tracking, and tabular numerals via `"tnum"` for financial data display.
+The typography system is the signature. A custom Vodafone display face runs all the way up to 144px in heavy 800-weight uppercase with negative tracking, and it holds that voice consistently across every page template. Body copy sits in a calm 16-18px mid-weight rhythm. This dual scale — monumental at the top, almost quiet at the bottom — creates the "corporate newsroom" feeling: every page reads like the front of a national paper whose masthead happens to be red.
 
-What truly distinguishes Stripe is its shadow system. Rather than the flat or single-layer approach of most sites, Stripe uses multi-layer, blue-tinted shadows: the signature `rgba(50,50,93,0.25)` combined with `rgba(0,0,0,0.1)` creates shadows with a cool, almost atmospheric depth -- like elements are floating in a twilight sky. The blue-gray undertone of the primary shadow color (50,50,93) ties directly to the navy-purple brand palette, making even elevation feel on-brand.
+Surface treatment is disciplined and predictable: a three-surface pass of white (editorial canvas) → Vodafone red (band dividers, CTA buttons, the famous speech-mark logo) → near-black charcoal (footer, share-ticker panel, global-impact map). There is almost no decorative shadow, almost no gradient, and almost no rounded-corner softness. Edges are small and clinical (2px and 6px), buttons operate as a two-tier system — tight 2px rectangles for utility/form actions, and fully-rounded 60px pills for primary content CTAs. This is a design system that trusts the brand color to do the heavy lifting and gets out of its way everywhere else.
 
 **Key Characteristics:**
-- sohne-var with OpenType `"ss01"` on all text -- a custom stylistic set that defines the brand's letterforms
-- Weight 300 as the signature headline weight -- light, confident, anti-convention
-- Negative letter-spacing at display sizes (-1.4px at 56px, progressive relaxation downward)
-- Blue-tinted multi-layer shadows using `rgba(50,50,93,0.25)` -- elevation that feels brand-colored
-- Deep navy (`#061b31`) headings instead of black -- warm, premium, financial-grade
-- Conservative border-radius (4px-8px) -- nothing pill-shaped, nothing harsh
-- Ruby (`#ea2261`) and magenta (`#f96bee`) accents for gradient and decorative elements
-- `SourceCodePro` as the monospace companion for code and technical labels
+- Vodafone Red (`#e60000`) is the single dominant accent — used for CTAs, dividers, band sections, the speech-mark logo, and the rotated "IMPACT" brand-mark type on the sustainability map
+- Monumental uppercase display type (up to 144px, weight 800, negative letter-spacing) paired with calm 16-18px body copy
+- A universal page rhythm: dark atmospheric hero → monumental uppercase headline → full-width red band → white editorial canvas → dark charcoal institutional panel → charcoal footer
+- Two-tier button system: tight 2px-radius rectangles for utility actions, fully-pill 60px buttons for primary content CTAs (both equally primary, selected by context)
+- Documentary photography (people, infrastructure, cities, nature) dominates over illustration; no stock-icon noise
+- Near-absence of shadows and gradients — hierarchy comes from type weight, color blocks, and spacing rather than elevation
+- Deep charcoal surface (`#25282b`) is reused as the footer AND the institutional data panel (share ticker, world map) — a single material for anything formal and numeric
 
 ## 2. Color Palette & Roles
 
 ### Primary
-- **Stripe Purple** (`#533afd`): Primary brand color, CTA backgrounds, link text, interactive highlights. A saturated blue-violet that anchors the entire system.
-- **Deep Navy** (`#061b31`): `--hds-color-heading-solid`. Primary heading color. Not black, not gray -- a very dark blue that adds warmth and depth to text.
-- **Pure White** (`#ffffff`): Page background, card surfaces, button text on dark backgrounds.
 
-### Brand & Dark
-- **Brand Dark** (`#1c1e54`): `--hds-color-util-brand-900`. Deep indigo for dark sections, footer backgrounds, and immersive brand moments.
-- **Dark Navy** (`#0d253d`): `--hds-color-core-neutral-975`. The darkest neutral -- almost-black with a blue undertone for maximum depth without harshness.
+- **Vodafone Red** (`#e60000`): The brand's single, non-negotiable signature — used for primary CTA backgrounds, the speech-mark logo, full-bleed band dividers between editorial sections, tag-pill outlines, and the rotated brand-mark type that labels the global-impact map. This red must never be substituted or tinted; it is the identity.
 
-### Accent Colors
-- **Ruby** (`#ea2261`): `--hds-color-accentColorMode-ruby-icon-solid`. Warm red-pink for icons, alerts, and accent elements.
-- **Magenta** (`#f96bee`): `--hds-color-accentColorMode-magenta-icon-gradientMiddle`. Vivid pink-purple for gradients and decorative highlights.
-- **Magenta Light** (`#ffd7ef`): `--hds-color-util-accent-magenta-100`. Tinted surface for magenta-themed cards and badges.
+### Secondary & Accent
 
-### Interactive
-- **Primary Purple** (`#533afd`): Primary link color, active states, selected elements.
-- **Purple Hover** (`#4434d4`): Darker purple for hover states on primary elements.
-- **Purple Deep** (`#2e2b8c`): `--hds-color-button-ui-iconHover`. Dark purple for icon hover states.
-- **Purple Light** (`#b9b9f9`): `--hds-color-action-bg-subduedHover`. Soft lavender for subdued hover backgrounds.
-- **Purple Mid** (`#665efd`): `--hds-color-input-selector-text-range`. Range selector and input highlight color.
+- **Pure White** (`#ffffff`): The dominant editorial canvas — page background, card backgrounds, reversed text on dark or red surfaces, and circular icon-button fills.
+- **Signal Blue** (`#3860be`): Reserved for inline text links in their resting state (underlined), providing a calm accessible blue that reads clearly against both white and dark surfaces.
+- **Deep Brand Red Shade** (`#ac1811`): A darker red appears on quiet label chips (notably on the sustainability page) — used sparingly for low-prominence tag elements that need red identity without drawing primary attention.
 
-### Neutral Scale
-- **Heading** (`#061b31`): Primary headings, nav text, strong labels.
-- **Label** (`#273951`): `--hds-color-input-text-label`. Form labels, secondary headings.
-- **Body** (`#64748d`): Secondary text, descriptions, captions.
-- **Success Green** (`#15be53`): Status badges, success indicators (with 0.2-0.4 alpha for backgrounds/borders).
-- **Success Text** (`#108c3d`): Success badge text color.
-- **Lemon** (`#9b6829`): `--hds-color-core-lemon-500`. Warning and highlight accent.
+### Surface & Background
 
-### Surface & Borders
-- **Border Default** (`#e5edf5`): Standard border color for cards, dividers, and containers.
-- **Border Purple** (`#b9b9f9`): Active/selected state borders on buttons and inputs.
-- **Border Soft Purple** (`#d6d9fc`): Subtle purple-tinted borders for secondary elements.
-- **Border Magenta** (`#ffd7ef`): Pink-tinted borders for magenta-themed elements.
-- **Border Dashed** (`#362baa`): Dashed borders for drop zones and placeholder elements.
+- **Canvas White** (`#ffffff`): The primary page and card surface. Every editorial module sits on this canvas.
+- **Light Neutral** (`#f2f2f2`): Used for filled neutral pill-badge backgrounds and quiet UI chrome where full white would disappear against the canvas.
+- **Charcoal Institutional Panel** (`#25282b`): The same color used for text is reused as a full-width dark surface for the footer, the share-ticker panel, and the global-impact map section. It transforms the page into a "data mode" environment.
+- **Translucent White Overlay** (`rgba(255,255,255,0.1)`): A soft glass tint used for pill buttons that sit on dark hero imagery — lets the photo breathe through the button.
 
-### Shadow Colors
-- **Shadow Blue** (`rgba(50,50,93,0.25)`): The signature -- blue-tinted primary shadow color.
-- **Shadow Dark Blue** (`rgba(3,3,39,0.25)`): Deeper blue shadow for elevated elements.
-- **Shadow Black** (`rgba(0,0,0,0.1)`): Secondary shadow layer for depth reinforcement.
-- **Shadow Ambient** (`rgba(23,23,23,0.08)`): Soft ambient shadow for subtle elevation.
-- **Shadow Soft** (`rgba(23,23,23,0.06)`): Minimal ambient shadow for light lift.
+### Neutrals & Text
+
+- **Charcoal Headline** (`#25282b`): All heading text on light surfaces and the charcoal surface color itself — a near-black with a faint cool tint, never pure black.
+- **Secondary Body Grey** (`#7e7e7e`): Body copy, meta text, and secondary labels — a true mid-grey that reads as unemphatic but still legible.
+- **Form Text Grey** (`#333333`): Borders on input-style ghost buttons and the text color inside them.
+- **Disabled Grey** (`#bebebe`): Inactive chip text on subtle ghost-style controls.
+- **Translucent White Divider** (`rgba(255,255,255,0.25)`): Hairline column dividers on dark institutional panels (footer columns, map legend rows).
+
+### Semantic & Accent
+
+- **Surface Red Band** (`#e60000`): The same brand red deployed as a full-width band between editorial sections — functions as a chapter divider and a visual amplifier for the brand. Appears on every page template.
+- **Tag Pill Red Border** (`#e60000`): 1px outline on light tag pills, letting the brand color touch small UI without drowning card content.
+
+### Gradient System
+
+Vodafone's design is intentionally gradient-free. The only tonal variation is a subtle photographic vignette on hero imagery (dim coral reefs, pine forests, cable-laying crews, urban twilight), where the image itself — not a CSS gradient — provides the tonal ramp. No linear gradients are used on buttons, cards, or surfaces.
 
 ## 3. Typography Rules
 
 ### Font Family
-- **Primary**: `sohne-var`, with fallback: `SF Pro Display`
-- **Monospace**: `SourceCodePro`, with fallback: `SFMono-Regular`
-- **OpenType Features**: `"ss01"` enabled globally on all sohne-var text; `"tnum"` for tabular numbers on financial data and captions.
+
+- **Primary**: `Vodafone` (custom corporate sans-serif)
+- **Fallback stack**: `Vodafone, "Helvetica Neue", Arial, sans-serif`
+- **Icon font**: `icomoon` — carries pictograph glyphs at 18px/24px/48px fixed sizes
+- **Rendering**: `font-smoothing: antialiased` across the board; OpenType features are not aggressively used — the design relies on weight and tracking, not stylistic alternates
 
 ### Hierarchy
 
-| Role | Font | Size | Weight | Line Height | Letter Spacing | Features | Notes |
-|------|------|------|--------|-------------|----------------|----------|-------|
-| Display Hero | sohne-var | 56px (3.50rem) | 300 | 1.03 (tight) | -1.4px | ss01 | Maximum size, whisper-weight authority |
-| Display Large | sohne-var | 48px (3.00rem) | 300 | 1.15 (tight) | -0.96px | ss01 | Secondary hero headlines |
-| Section Heading | sohne-var | 32px (2.00rem) | 300 | 1.10 (tight) | -0.64px | ss01 | Feature section titles |
-| Sub-heading Large | sohne-var | 26px (1.63rem) | 300 | 1.12 (tight) | -0.26px | ss01 | Card headings, sub-sections |
-| Sub-heading | sohne-var | 22px (1.38rem) | 300 | 1.10 (tight) | -0.22px | ss01 | Smaller section heads |
-| Body Large | sohne-var | 18px (1.13rem) | 300 | 1.40 | normal | ss01 | Feature descriptions, intro text |
-| Body | sohne-var | 16px (1.00rem) | 300-400 | 1.40 | normal | ss01 | Standard reading text |
-| Button | sohne-var | 16px (1.00rem) | 400 | 1.00 (tight) | normal | ss01 | Primary button text |
-| Button Small | sohne-var | 14px (0.88rem) | 400 | 1.00 (tight) | normal | ss01 | Secondary/compact buttons |
-| Link | sohne-var | 14px (0.88rem) | 400 | 1.00 (tight) | normal | ss01 | Navigation links |
-| Caption | sohne-var | 13px (0.81rem) | 400 | normal | normal | ss01 | Small labels, metadata |
-| Caption Small | sohne-var | 12px (0.75rem) | 300-400 | 1.33-1.45 | normal | ss01 | Fine print, timestamps |
-| Caption Tabular | sohne-var | 12px (0.75rem) | 300-400 | 1.33 | -0.36px | tnum | Financial data, numbers |
-| Micro | sohne-var | 10px (0.63rem) | 300 | 1.15 (tight) | 0.1px | ss01 | Tiny labels, axis markers |
-| Micro Tabular | sohne-var | 10px (0.63rem) | 300 | 1.15 (tight) | -0.3px | tnum | Chart data, small numbers |
-| Nano | sohne-var | 8px (0.50rem) | 300 | 1.07 (tight) | normal | ss01 | Smallest labels |
-| Code Body | SourceCodePro | 12px (0.75rem) | 500 | 2.00 (relaxed) | normal | -- | Code blocks, syntax |
-| Code Bold | SourceCodePro | 12px (0.75rem) | 700 | 2.00 (relaxed) | normal | -- | Bold code, keywords |
-| Code Label | SourceCodePro | 12px (0.75rem) | 500 | 2.00 (relaxed) | normal | uppercase | Technical labels |
-| Code Micro | SourceCodePro | 9px (0.56rem) | 500 | 1.00 (tight) | normal | ss01 | Tiny code annotations |
+| Role | Size | Weight | Line Height | Letter Spacing | Notes |
+|------|------|--------|-------------|----------------|-------|
+| Display / Hero XL | 144px | 800 | 0.79 | -1px | Uppercase; the signature "EVERYONE. CONNECTED." treatment |
+| Display / Hero L | 126px | 800 | 0.90 | -1px | Uppercase; used when the hero headline is longer |
+| Display / Hero M | 90px | 800 | 0.93 | — | Uppercase; secondary hero or full-bleed section heads |
+| Display / Impact | 70px | 800 | 1.17 | -1px | Sustainability section numeric / callout scale |
+| H1 — Light | 48px | 300 | 1.08 | — | Section headlines set in light weight for editorial calm |
+| H1 — Bold | 48px | 800 | 1.00 | -1px | Institutional data headers (share price on charcoal panel) |
+| H2 — Light | 40px | 300 | 1.10 | — | Sub-section headers |
+| H2 — Bold | 40px | 700 | 1.10 | — | Denser sub-section headers |
+| H3 — Bold | 32px | 700 | 1.25 | — | Card cluster titles and feature intros |
+| H4 — Bold | 24px | 700 | 1.00 | — | Card titles (news, feature, article modules) |
+| H4 — Light | 24px | 300 | 1.42 | — | Intro paragraphs on investor / sustainability pages |
+| H5 — Bold | 20px | 700 | 1.30 | — | Compact module titles and side callouts |
+| Lead Body | 20px | 400 | 1.40 | — | Introductory paragraphs under large headlines |
+| Body Large | 18px | 400 | 1.56 | — | Long-form article body and prominent copy |
+| Body Bold | 18px | 600 | 1.56 | — | Emphasized inline phrases |
+| Body Base | 16px | 400 | 1.38 | — | Default paragraph size |
+| Label Uppercase | 16px | 800 | 1.50 | — | Uppercase navigational labels |
+| Eyebrow / Date | 14px | 400/700 | 1.43 | — | Article date stamps and meta (14 APR 2026) |
+| Tag Pill | 14px | 700 | 1.50 | — | Badge text inside red-outlined pills |
+| Caption Uppercase | 14px | 400 | 1.14 | — | Uppercase meta label |
+| Caption | 12px | 500 | 2.00 | — | Footer meta, legal lines |
+| Micro Label | 12px | 600 | 1.33 | — | Uppercase tiny labels on badges and counters |
+| Button Primary | 14.4px | 700 | 1.00 | 0.144px | Primary filled button label |
+| Button Compact | 12px | 700 | 1.00 | 0.12px | Compact button label |
 
 ### Principles
-- **Light weight as signature**: Weight 300 at display sizes is Stripe's most distinctive typographic choice. Where others use 600-700 to command attention, Stripe uses lightness as luxury -- the text is so confident it doesn't need weight to be authoritative.
-- **ss01 everywhere**: The `"ss01"` stylistic set is non-negotiable. It modifies specific glyphs (likely alternate `a`, `g`, `l` forms) to create a more geometric, contemporary feel across all sohne-var text.
-- **Two OpenType modes**: `"ss01"` for display/body text, `"tnum"` for tabular numerals in financial data. These never overlap -- a number in a paragraph uses ss01, a number in a data table uses tnum.
-- **Progressive tracking**: Letter-spacing tightens proportionally with size: -1.4px at 56px, -0.96px at 48px, -0.64px at 32px, -0.26px at 26px, normal at 16px and below.
-- **Two-weight simplicity**: Primarily 300 (body and headings) and 400 (UI/buttons). No bold (700) in the primary font -- SourceCodePro uses 500/700 for code contrast.
+
+- **Dual-scale drama**: the system deliberately stretches from 144px down to 8.5px without mid-range showing off. The result is a clear corporate hierarchy — monumental for brand moments, calm for reading.
+- **Uppercase display, mixed-case body**: all the largest display sizes are uppercase with negative tracking, while everything 48px and below is sentence case with normal tracking.
+- **Weight spread**: only three real weights do the work — 800 (display), 700 (bold bodies, buttons, tags), and 400 (reading body). A lighter 300-weight is used for editorial-style 40px/48px headlines when a calmer voice is wanted.
+- **No italics, no decorative letterspacing on body**: the body system is deliberately neutral so the display work can shout.
+- **Rotated brand-mark type**: on the sustainability section, the word "IMPACT" is set in brand red at a large display size and rotated 90° to run vertically along the edge of a dark world-map panel — a distinctive typographic flourish that the template uses to label its institutional data surfaces.
+
+### Note on Font Substitutes
+
+The Vodafone corporate typeface is proprietary. When recreating the look in open systems, substitute with **Inter** at weights 400/600/800, or **Neue Haas Grotesk** if available. Inter needs its letter-spacing reduced by roughly 1-2% at display sizes (80px+) to approximate the Vodafone face's tight tracking; its line-height should be set to 0.85-0.95 for the uppercase display tier.
 
 ## 4. Component Stylings
 
 ### Buttons
 
-**Primary Purple**
-- Background: `#533afd`
-- Text: `#ffffff`
-- Padding: 8px 16px
-- Radius: 4px
-- Font: 16px sohne-var weight 400, `"ss01"`
-- Hover: `#4434d4` background
-- Use: Primary CTA ("Start now", "Contact sales")
+Vodafone operates a genuine two-tier primary button system. Both tiers are used as primary calls to action — the difference is context (form/chrome vs editorial/content), not hierarchy.
 
-**Ghost / Outlined**
-- Background: transparent
-- Text: `#533afd`
-- Padding: 8px 16px
-- Radius: 4px
-- Border: `1px solid #b9b9f9`
-- Font: 16px sohne-var weight 400, `"ss01"`
-- Hover: background shifts to `rgba(83,58,253,0.05)`
-- Use: Secondary actions
+**Primary Red Rectangle** (utility / form CTA — "Accept All Cookies", "Subscribe")
+- Background: Vodafone Red (`#e60000`)
+- Text: Pure White (`#ffffff`), 14.4px, weight 700, letter-spacing 0.144px
+- Padding: 12px vertical, 10px horizontal
+- Border: 1px solid Vodafone Red (`#e60000`)
+- Border radius: 2px — deliberately sharp-cornered
+- Default state: solid red fill with crisp 2px corners
+- Active state: brief opacity drop to `0.9` on press
 
-**Transparent Info**
-- Background: transparent
-- Text: `#2874ad`
-- Padding: 8px 16px
-- Radius: 4px
-- Border: `1px solid rgba(43,145,223,0.2)`
-- Use: Tertiary/info-level actions
+**Primary Red Pill** (editorial / content CTA — "Link to Our approach to ESG", "EXPLORE CONNECTING PEOPLE")
+- Background: Vodafone Red (`#e60000`)
+- Text: Pure White (`#ffffff`), 14.4px, weight 700, letter-spacing 0.144px
+- Padding: 16px uniform
+- Border radius: 60px — fully pill-shaped
+- Default state: solid red fill with rounded ends
+- Active state: brief opacity drop to `0.9` on press
 
-**Neutral Ghost**
-- Background: transparent (`rgba(255,255,255,0)`)
-- Text: `rgba(16,16,16,0.3)`
-- Padding: 8px 16px
-- Radius: 4px
-- Outline: `1px solid rgb(212,222,233)`
-- Use: Disabled or muted actions
+**Ghost White Rectangle** (secondary form action)
+- Background: Pure White (`#ffffff`)
+- Text: Form Text Grey (`#333333`), 14.4px, weight 700
+- Padding: 12px vertical, 10px horizontal
+- Border: 1px solid Form Text Grey (`#333333`)
+- Border radius: 2px
+- Default state: white fill with charcoal outline
+- Active state: opacity `0.9` on press
+
+**Glass Pill** (sits on dark hero imagery — secondary content CTA)
+- Background: Pure White at 10% opacity (`rgba(255,255,255,0.1)`)
+- Text: Pure White (`#ffffff`), weight 700
+- Padding: 8px vertical, 16px horizontal
+- Border radius: 24px — fully pill-shaped
+- Default state: soft translucent pill lets the photo breathe through
+
+**Content Ghost Pill** (inline within editorial cards — low-emphasis content CTA)
+- Background: Black at 5% opacity (`rgba(0,0,0,0.05)`)
+- Text: Vodafone Red (`#e60000`), 14.4px, weight 700
+- Padding: 15px uniform
+- Border radius: 60px — fully pill-shaped
+- Default state: nearly transparent pill with red text
+
+**Icon Control Button** (video play/pause, carousel arrows, close)
+- Background: Pure White (`#ffffff`)
+- Icon color: Charcoal Headline (`#25282b`)
+- Border radius: 50% — perfect circle
+- Outline: 1px solid white, used for focus indication
+- Size: typically 32-40px diameter
 
 ### Cards & Containers
-- Background: `#ffffff`
-- Border: `1px solid #e5edf5` (standard) or `1px solid #061b31` (dark accent)
-- Radius: 4px (tight), 5px (standard), 6px (comfortable), 8px (featured)
-- Shadow (standard): `rgba(50,50,93,0.25) 0px 30px 45px -30px, rgba(0,0,0,0.1) 0px 18px 36px -18px`
-- Shadow (ambient): `rgba(23,23,23,0.08) 0px 15px 35px 0px`
-- Hover: shadow intensifies, often adding the blue-tinted layer
 
-### Badges / Tags / Pills
-**Neutral Pill**
-- Background: `#ffffff`
-- Text: `#000000`
-- Padding: 0px 6px
-- Radius: 4px
-- Border: `1px solid #f6f9fc`
-- Font: 11px weight 400
+**News / Editorial Card** (homepage article tile)
+- Background: Pure White (`#ffffff`)
+- Border radius: 6px (applied to image corners and card container)
+- Shadow: none — cards rely on spacing and the image aspect ratio for separation
+- Internal layout: 16:9 image on top → 12px gap → eyebrow row (date + tag pill) → 8px gap → H4 Bold title → 16px card padding on sides and bottom
+- The card image uses `object-fit: cover` and rounded top corners (6px top-left/top-right)
 
-**Success Badge**
-- Background: `rgba(21,190,83,0.2)`
-- Text: `#108c3d`
-- Padding: 1px 6px
-- Radius: 4px
-- Border: `1px solid rgba(21,190,83,0.4)`
-- Font: 10px weight 300
+**Asymmetric Corner Card** (featured homepage cards)
+- Background: Pure White (`#ffffff`)
+- Border radius: `0px 6px 0px 0px` — a deliberate single-corner-rounded shape that echoes the Vodafone speech-mark logo's curved geometry
+- No shadow, no border — the asymmetric radius itself is the visual signature
+
+**Circular Portrait / Pictogram Container** (sustainability page)
+- Background: Pure White (`#ffffff`)
+- Border radius: 100% — perfect circle
+- Used for ESG pictograms and executive portraits inside the institutional content area
 
 ### Inputs & Forms
-- Border: `1px solid #e5edf5`
-- Radius: 4px
-- Focus: `1px solid #533afd` or purple ring
-- Label: `#273951`, 14px sohne-var
-- Text: `#061b31`
-- Placeholder: `#64748d`
+
+Vodafone's corporate site does not expose many inline form controls on the homepage, but button-style inputs follow these rules:
+
+- Background: Pure White (`#ffffff`)
+- Text: Form Text Grey (`#333333`), 16px, weight 400
+- Border: 1px solid Form Text Grey (`#333333`)
+- Border radius: 2px
+- Padding: 12px 10px
+- Error state (when shown): the 1px border shifts to Vodafone Red (`#e60000`) and error message text inherits the same red at 12px weight 600
 
 ### Navigation
-- Clean horizontal nav on white, sticky with blur backdrop
-- Brand logotype left-aligned
-- Links: sohne-var 14px weight 400, `#061b31` text with `"ss01"`
-- Radius: 6px on nav container
-- CTA: purple button right-aligned ("Sign in", "Start now")
-- Mobile: hamburger toggle with 6px radius
 
-### Decorative Elements
-**Dashed Borders**
-- `1px dashed #362baa` (purple) for placeholder/drop zones
-- `1px dashed #ffd7ef` (magenta) for magenta-themed decorative borders
+**Top bar**
+- Background: transparent over hero imagery; solid white (`#ffffff`) on scroll or interior pages
+- Height: approximately 64px desktop, 56px mobile
+- Logo: Vodafone speech-mark, 40×40px red circle with a white "speech-mark" cut-out, left-aligned
+- Nav links: 16px weight 400 Charcoal Headline (`#25282b`) on white; reversed to white when sitting on dark hero imagery
+- Right-side utility: small icon links (search, locale, menu) rendered as 24px icomoon glyphs
+- On interior pages (Investors, Sustainable Business), the top bar shows additional secondary-nav row: "Vodafone Business / Vodafone Foundation / Our site" labels, aligned right
 
-**Gradient Accents**
-- Ruby-to-magenta gradients (`#ea2261` to `#f96bee`) for hero decorations
-- Brand dark sections use `#1c1e54` backgrounds with white text
+**Mobile collapse**
+- At approximately 768px the horizontal nav collapses into a hamburger
+- Mobile menu opens as a full-width overlay with white surface, 18px weight 400 link rows, 16px vertical padding per row
+
+### Image Treatment
+
+- **Hero images**: full-bleed, dark atmospheric photography (coral reefs, pine forests, cable crews, urban twilight) with a natural vignette or cool-tone color grade — no CSS overlay is needed because the imagery itself is pre-graded
+- **Card thumbnails**: 16:9 aspect ratio, 6px top corner radius matching the card
+- **Square editorial images**: 1:1 ratio used in feature modules, always 6px corner radius
+- **Round portraits**: 100% (perfect circle) for executive headshots and ESG pictograms
+- **Loading**: lazy-loading triggers on scroll; images stabilize within ~200ms of entering the viewport
+- **No decorative borders on images** — the card radius does all the framing work
+
+### Tag Pills / Badges
+
+Two distinct pill styles appear:
+
+**Outlined Red Pill** (used inline on article card metadata, e.g., "EMPOWERING PEOPLE")
+- Background: Pure White at 80% opacity (`rgba(255,255,255,0.8)`)
+- Text: Near-black at 80% opacity (`rgba(0,0,0,0.8)`), 12px, weight 600, uppercase
+- Border: 1px solid Vodafone Red (`#e60000`)
+- Padding: 6px
+- Border radius: small-rounded (roughly 2px)
+
+**Filled Neutral Pill** (quieter tags)
+- Background: Light Neutral (`#f2f2f2`)
+- Text: Charcoal Headline (`#25282b`), 14px, weight 700
+- Padding: 4px 12px
+- Border radius: 32px — fully pill-shaped
+
+### Red Divider Band
+
+A signature reusable component that appears on every page template: a full-width band of Vodafone Red (`#e60000`) that runs horizontally across the page to separate the monumental hero from the editorial body beneath it. It carries no text and no controls — it simply is the brand's way of saying "new chapter." Typical height: 40-80px.
+
+### Share Ticker Panel (Investor pages)
+
+A distinctive institutional component that anchors the investor template:
+- Background: Charcoal Institutional Panel (`#25282b`)
+- Large numeric display: share price set in 48px weight 800 white type with negative letter-spacing (e.g., "116.05 GBX")
+- Metadata row: delay notice (e.g., "15-min delayed") and timestamp in 14px weight 400 secondary grey text
+- Layout: sits as a horizontal strip above the footer, spans the full content width
+- Hairline dividers (`rgba(255,255,255,0.25)`) separate the ticker from the footer columns
+
+### Global Impact Map Panel (Sustainability pages)
+
+A signature reusable component that anchors the sustainability template:
+- Background: Charcoal Institutional Panel (`#25282b`)
+- A dark minimal world-map illustration in slightly lighter grey
+- Red circular markers (`#e60000`) plotted on geographic locations where the brand operates
+- Vertically-rotated brand word "IMPACT" set in Vodafone Red at large display size (weight 800, uppercase, 90° rotated) running along one edge of the panel — this is the template's signature typographic move
+- Small legend with red markers and white uppercase labels at the top-left
+
+### Footer
+
+A universal component across all page templates:
+- Background: Charcoal Institutional Panel (`#25282b`)
+- Layout: 4-column link grid (Our company / Investors / Vodafone websites / Share price) followed by a "Connect with us" social row and legal/privacy line
+- Logo: red speech-mark repeats bottom-right at 32-40px
+- Column header type: 16px weight 800 uppercase white
+- Column link type: 14px weight 400 white, stacked vertically with 12px row spacing
+- Divider hairlines: `rgba(255,255,255,0.25)` between column group and legal row
 
 ## 5. Layout Principles
 
 ### Spacing System
-- Base unit: 8px
-- Scale: 1px, 2px, 4px, 6px, 8px, 10px, 11px, 12px, 14px, 16px, 18px, 20px
-- Notable: The scale is dense at the small end (every 2px from 4-12), reflecting Stripe's precision-oriented UI for financial data
+
+Base unit: **8px**. The scale accommodates both tight UI (1px, 2px, 4px) and generous editorial rhythm (16px, 20px, 24px, 32px). Two values (`32px` and `38px`) appear across every page in the analysis, making them the template's universal rhythm constants.
+
+| Token | Value | Typical Use |
+|-------|-------|-------------|
+| 2xs | 2px | Hairline separators |
+| xs | 4px | Icon-to-text gap in tight controls |
+| sm | 8px | Base rhythm unit |
+| md | 12px | Card internal padding, eyebrow-to-title gap |
+| base | 16px | Paragraph rhythm, card padding, pill button padding |
+| lg | 20px | Section-internal spacing |
+| xl | 24px | Card-to-card spacing, column gutters |
+| 2xl | 32px | Section intro-to-content breaks — universal constant |
+| 3xl | 38px | Band-to-next-section vertical push — universal constant |
+| section | 64-96px | Vertical rhythm between major editorial modules |
 
 ### Grid & Container
-- Max content width: approximately 1080px
-- Hero: centered single-column with generous padding, lightweight headlines
-- Feature sections: 2-3 column grids for feature cards
-- Full-width dark sections with `#1c1e54` background for brand immersion
-- Code/dashboard previews as contained cards with blue-tinted shadows
+
+- **Max content width**: approximately 1440px on very large screens; articles and hero modules typically sit at 1200px
+- **Column pattern on cards**: 3-up or 4-up card grid at desktop (1200-1440px), 2-up at tablet (768-1024px), stacked 1-up at mobile (<768px)
+- **Horizontal padding**: 32px at desktop edge, 20px at tablet, 16px at mobile
+- **Gutters between cards**: 24px desktop, 16px mobile
+- **Institutional panel (share ticker, world map, footer)**: always full-bleed edge-to-edge at every breakpoint
 
 ### Whitespace Philosophy
-- **Precision spacing**: Unlike the vast emptiness of minimalist systems, Stripe uses measured, purposeful whitespace. Every gap is a deliberate typographic choice.
-- **Dense data, generous chrome**: Financial data displays (tables, charts) are tightly packed, but the UI chrome around them is generously spaced. This creates a sense of controlled density -- like a well-organized spreadsheet in a beautiful frame.
-- **Section rhythm**: White sections alternate with dark brand sections (`#1c1e54`), creating a dramatic light/dark cadence that prevents monotony without introducing arbitrary color.
+
+Vodafone's editorial canvas leans generous — whitespace is used as a visual palette cleanser between a monumental headline and the card grid or data panel that follows. Sections are separated by tall vertical rhythm (64-96px) plus the occasional red band that acts as both a separator and a brand signal. Within cards, spacing is tight and efficient (12-16px) so the photography can take the stage.
 
 ### Border Radius Scale
-- Micro (1px): Fine-grained elements, subtle rounding
-- Standard (4px): Buttons, inputs, badges, cards -- the workhorse
-- Comfortable (5px): Standard card containers
-- Relaxed (6px): Navigation, larger interactive elements
-- Large (8px): Featured cards, hero elements
-- Compound: `0px 0px 6px 6px` for bottom-rounded containers (tab panels, dropdown footers)
+
+| Token | Value | Typical Use |
+|-------|-------|-------------|
+| hairline | 1px | Inline text wraps, small badges |
+| button-tight | 2px | Primary and secondary rectangle button corners — the brand's utility-form look |
+| card | 6px | News cards, images, input fields |
+| asymmetric | `0px 6px 0px 0px` | Featured cards (top-right corner only) |
+| glass-pill | 24px | Translucent white pills sitting on dark hero imagery |
+| badge-pill | 32px | Filled neutral pill badges |
+| cta-pill | 60px | Primary red content CTAs — the brand's editorial button look |
+| circle | 50% | Icon buttons, carousel arrows, close controls |
+| portrait | 100% | Circular portraits and ESG pictograms |
 
 ## 6. Depth & Elevation
 
+Vodafone's system is deliberately flat. There is almost no conventional box-shadow in the UI. Hierarchy is carried by color (red bands, charcoal institutional panels), typography weight (800 vs 400), and spacing.
+
 | Level | Treatment | Use |
 |-------|-----------|-----|
-| Flat (Level 0) | No shadow | Page background, inline text |
-| Ambient (Level 1) | `rgba(23,23,23,0.06) 0px 3px 6px` | Subtle card lift, hover hints |
-| Standard (Level 2) | `rgba(23,23,23,0.08) 0px 15px 35px` | Standard cards, content panels |
-| Elevated (Level 3) | `rgba(50,50,93,0.25) 0px 30px 45px -30px, rgba(0,0,0,0.1) 0px 18px 36px -18px` | Featured cards, dropdowns, popovers |
-| Deep (Level 4) | `rgba(3,3,39,0.25) 0px 14px 21px -14px, rgba(0,0,0,0.1) 0px 8px 17px -8px` | Modals, floating panels |
-| Ring (Accessibility) | `2px solid #533afd` outline | Keyboard focus ring |
+| 0 — Surface | No shadow, no border | Default card, default section |
+| 1 — Outline | 1px solid border at low-opacity | Ghost buttons, outlined pills |
+| 2 — Inset Highlight | `inset 0 0 0 1px` on focus | Pressed / focused controls |
+| 3 — Photographic depth | The photography itself carries the depth | Hero imagery |
+| 4 — Surface shift | Charcoal institutional panel below a white editorial canvas | Share ticker / world map / footer |
 
-**Shadow Philosophy**: Stripe's shadow system is built on a principle of chromatic depth. Where most design systems use neutral gray or black shadows, Stripe's primary shadow color (`rgba(50,50,93,0.25)`) is a deep blue-gray that echoes the brand's navy palette. This creates shadows that don't just add depth -- they add brand atmosphere. The multi-layer approach pairs this blue-tinted shadow with a pure black secondary layer (`rgba(0,0,0,0.1)`) at a different offset, creating a parallax-like depth where the branded shadow sits farther from the element and the neutral shadow sits closer. The negative spread values (-30px, -18px) ensure shadows don't extend beyond the element's footprint horizontally, keeping elevation vertical and controlled.
+Shadow philosophy: Vodafone treats drop shadows as a distraction from brand clarity. The few extracted shadow tokens are reserved for inset focus rings. The dominant "elevation" in the system is a **color surface shift** — switching from the white editorial canvas to the charcoal institutional panel — rather than a lift-off drop shadow.
 
 ### Decorative Depth
-- Dark brand sections (`#1c1e54`) create immersive depth through background color contrast
-- Gradient overlays with ruby-to-magenta transitions for hero decorations
-- Shadow color `rgba(0,55,112,0.08)` (`--hds-color-shadow-sm-top`) for top-edge shadows on sticky elements
+
+The only decorative depth cues are:
+- Atmospheric dark hero photography that carries its own cinematic tonal depth (no CSS overlay needed)
+- The rotated vertical "IMPACT" wordmark on the sustainability map, which creates the illusion of a fourth wall alongside the map panel
 
 ## 7. Do's and Don'ts
 
 ### Do
-- Use sohne-var with `"ss01"` on every text element -- the stylistic set IS the brand
-- Use weight 300 for all headlines and body text -- lightness is the signature
-- Apply blue-tinted shadows (`rgba(50,50,93,0.25)`) for all elevated elements
-- Use `#061b31` (deep navy) for headings instead of `#000000` -- the warmth matters
-- Keep border-radius between 4px-8px -- conservative rounding is intentional
-- Use `"tnum"` for any tabular/financial number display
-- Layer shadows: blue-tinted far + neutral close for depth parallax
-- Use `#533afd` purple as the primary interactive/CTA color
+
+- Use Vodafone Red (`#e60000`) as the single loudest element on any screen — one primary CTA per fold, one red band per editorial break
+- Set display headlines in uppercase 800-weight with tight negative tracking; let them run to 90-144px on desktop
+- Pair monumental display type with calm 16-18px body copy — the scale jump is the system
+- Switch the button radius based on context: 2px rectangles for form and utility actions, 60px pills for editorial content CTAs
+- Let documentary photography breathe at 16:9 or 1:1 on a 6px radius — no decorative borders, no heavy overlays
+- Use the red band as a full-width chapter divider between every hero and the content below it
+- Anchor every page with a charcoal institutional surface (`#25282b`) — the footer always, and on investor/sustainability pages extend the same color up to include the share ticker or the global-impact map
+- Respect the universal page rhythm: dark hero → red band → white editorial → charcoal institutional → charcoal footer
 
 ### Don't
-- Don't use weight 600-700 for sohne-var headlines -- weight 300 is the brand voice
-- Don't use large border-radius (12px+, pill shapes) on cards or buttons -- Stripe is conservative
-- Don't use neutral gray shadows -- always tint with blue (`rgba(50,50,93,...)`)
-- Don't skip `"ss01"` on any sohne-var text -- the alternate glyphs define the personality
-- Don't use pure black (`#000000`) for headings -- always `#061b31` deep navy
-- Don't use warm accent colors (orange, yellow) for interactive elements -- purple is primary
-- Don't apply positive letter-spacing at display sizes -- Stripe tracks tight
-- Don't use the magenta/ruby accents for buttons or links -- they're decorative/gradient only
+
+- Don't introduce a second brand hue to rival Vodafone Red — no teals, no purples, no orange accents
+- Don't soften rectangle button corners beyond 2px, and don't shrink pill button corners below 60px — the two shapes are both load-bearing
+- Don't add drop shadows to cards or buttons — the system is intentionally flat and uses surface color to carry elevation
+- Don't use gradients on backgrounds, buttons, or text
+- Don't mix uppercase tracking on body text — uppercase is reserved for display, labels, and micro-labels
+- Don't use italics for emphasis — use weight 600/700 instead
+- Don't decorate headlines with colored underlines or highlights — the type does the work
+- Don't use pure black (`#000000`) for text or surfaces — always use Charcoal Headline (`#25282b`)
 
 ## 8. Responsive Behavior
 
 ### Breakpoints
+
+The practical tiers observed across all three templates:
+
 | Name | Width | Key Changes |
 |------|-------|-------------|
-| Mobile | <640px | Single column, reduced heading sizes, stacked cards |
-| Tablet | 640-1024px | 2-column grids, moderate padding |
-| Desktop | 1024-1280px | Full layout, 3-column feature grids |
-| Large Desktop | >1280px | Centered content with generous margins |
+| Mobile | ≤ 600px | Nav collapses to hamburger; hero display drops to ~56-72px; cards stack 1-up |
+| Mobile Large | 601-767px | Hero display ~72-90px; cards still stack 1-up |
+| Tablet | 768-1023px | Nav re-expands; cards grid 2-up; hero display ~90-120px |
+| Laptop | 1024-1199px | Full nav; cards 3-up; hero display ~120-144px |
+| Desktop | 1200-1439px | Standard editorial layout; cards 3-up or 4-up |
+| Wide | ≥ 1440px | Content caps at 1440px; outer canvas padding grows |
 
 ### Touch Targets
-- Buttons use comfortable padding (8px-16px vertical)
-- Navigation links at 14px with adequate spacing
-- Badges have 6px horizontal padding minimum for tap targets
-- Mobile nav toggle with 6px radius button
+
+All interactive controls meet a 44×44px minimum on mobile. Icon buttons use 40×40px circular hit areas which expand with 4px invisible padding on touch devices. Primary CTA buttons land at approximately 48×48px on mobile (16px top/bottom + text line for pills; 12px + text line for rectangles).
 
 ### Collapsing Strategy
-- Hero: 56px display -> 32px on mobile, weight 300 maintained
-- Navigation: horizontal links + CTAs -> hamburger toggle
-- Feature cards: 3-column -> 2-column -> single column stacked
-- Dark brand sections: maintain full-width treatment, reduce internal padding
-- Financial data tables: horizontal scroll on mobile
-- Section spacing: 64px+ -> 40px on mobile
-- Typography scale compresses: 56px -> 48px -> 32px hero sizes across breakpoints
+
+- **Nav**: horizontal links collapse into a hamburger at 768px; the logo stays left-aligned at all widths
+- **Card grid**: 4-up → 3-up at 1200px → 2-up at 768px → 1-up at 600px, with gutters shrinking from 24px to 16px
+- **Hero display type**: step-reduces through 144 → 126 → 90 → 72 → 56px as viewports shrink
+- **Section padding**: 96px vertical at desktop, 64px at tablet, 48px at mobile
+- **Red divider bands**: remain full-width at every breakpoint; their vertical height compresses from ~80px at desktop to ~40px at mobile
+- **Institutional panels (share ticker / world map)**: on mobile, multi-column content restacks into a single vertical stream but the charcoal surface stays edge-to-edge
+- **Vertically-rotated "IMPACT" wordmark**: becomes a horizontal label or is dropped entirely on mobile where vertical space is limited
 
 ### Image Behavior
-- Dashboard/product screenshots maintain blue-tinted shadow at all sizes
-- Hero gradient decorations simplify on mobile
-- Code blocks maintain `SourceCodePro` treatment, may horizontally scroll
-- Card images maintain consistent 4px-6px border-radius
+
+- Hero imagery: art-directed variant at mobile (tighter crop) versus desktop (wide atmospheric frame)
+- Card thumbnails: always 16:9 regardless of viewport; `loading="lazy"` is standard
+- Circular portraits: fixed at 80-120px diameter on desktop, shrinking to 64-80px on mobile
+- Logo: fixed at 40×40px across breakpoints (consistent brand mark size)
 
 ## 9. Agent Prompt Guide
 
 ### Quick Color Reference
-- Primary CTA: Stripe Purple (`#533afd`)
-- CTA Hover: Purple Dark (`#4434d4`)
-- Background: Pure White (`#ffffff`)
-- Heading text: Deep Navy (`#061b31`)
-- Body text: Slate (`#64748d`)
-- Label text: Dark Slate (`#273951`)
-- Border: Soft Blue (`#e5edf5`)
-- Link: Stripe Purple (`#533afd`)
-- Dark section: Brand Dark (`#1c1e54`)
-- Success: Green (`#15be53`)
-- Accent decorative: Ruby (`#ea2261`), Magenta (`#f96bee`)
+
+- Primary CTA: "Vodafone Red (`#e60000`)"
+- Background: "Canvas White (`#ffffff`)"
+- Heading text: "Charcoal Headline (`#25282b`)"
+- Body text: "Secondary Body Grey (`#7e7e7e`)"
+- Institutional surface: "Charcoal Institutional Panel (`#25282b`)"
+- Inline link: "Signal Blue (`#3860be`)"
+- Quiet pill background: "Light Neutral (`#f2f2f2`)"
 
 ### Example Component Prompts
-- "Create a hero section on white background. Headline at 48px sohne-var weight 300, line-height 1.15, letter-spacing -0.96px, color #061b31, font-feature-settings 'ss01'. Subtitle at 18px weight 300, line-height 1.40, color #64748d. Purple CTA button (#533afd, 4px radius, 8px 16px padding, white text) and ghost button (transparent, 1px solid #b9b9f9, #533afd text, 4px radius)."
-- "Design a card: white background, 1px solid #e5edf5 border, 6px radius. Shadow: rgba(50,50,93,0.25) 0px 30px 45px -30px, rgba(0,0,0,0.1) 0px 18px 36px -18px. Title at 22px sohne-var weight 300, letter-spacing -0.22px, color #061b31, 'ss01'. Body at 16px weight 300, #64748d."
-- "Build a success badge: rgba(21,190,83,0.2) background, #108c3d text, 4px radius, 1px 6px padding, 10px sohne-var weight 300, border 1px solid rgba(21,190,83,0.4)."
-- "Create navigation: white sticky header with backdrop-filter blur(12px). sohne-var 14px weight 400 for links, #061b31 text, 'ss01'. Purple CTA 'Start now' right-aligned (#533afd bg, white text, 4px radius). Nav container 6px radius."
-- "Design a dark brand section: #1c1e54 background, white text. Headline 32px sohne-var weight 300, letter-spacing -0.64px, 'ss01'. Body 16px weight 300, rgba(255,255,255,0.7). Cards inside use rgba(255,255,255,0.1) border with 6px radius."
+
+- "Create a primary red rectangle button: Vodafone Red (`#e60000`) background, pure white 14.4px weight 700 text, 2px border radius (sharp corners), 12px vertical × 10px horizontal padding. Use for form and utility actions. No shadow, no gradient."
+- "Create a primary red pill CTA: Vodafone Red (`#e60000`) background, pure white 14.4px weight 700 text, 60px border radius (fully pill-shaped), 16px uniform padding. Use for editorial content calls-to-action."
+- "Design an editorial news card: white background, 6px border radius, 16:9 image at the top, 12px eyebrow row containing a date and a red-outlined uppercase tag pill, then a 24px weight 700 Charcoal title. No shadow — spacing alone separates cards."
+- "Build a hero section: dark atmospheric photo as the full-bleed background, monumental uppercase headline at 144px weight 800 with -1px letter-spacing, single Vodafone Red pill CTA beneath it, no overlay gradient."
+- "Create a red divider band: full-width strip of Vodafone Red (`#e60000`), 64px tall on desktop and 40px on mobile, no text, no controls — it acts purely as a visual chapter break between editorial sections."
+- "Design an institutional data panel: full-bleed Charcoal Institutional Panel (`#25282b`) background, large numeric display at 48px weight 800 white with negative letter-spacing, 14px weight 400 grey meta row beneath. Use for share ticker or stats callout."
+- "Design a global impact map: Charcoal Institutional Panel (`#25282b`) background, minimal grey world-map illustration, red Vodafone-red circular markers on operational locations, the brand word 'IMPACT' set at large display size in brand red and rotated 90° to run vertically along one edge."
 
 ### Iteration Guide
-1. Always enable `font-feature-settings: "ss01"` on sohne-var text -- this is the brand's typographic DNA
-2. Weight 300 is the default; use 400 only for buttons/links/navigation
-3. Shadow formula: `rgba(50,50,93,0.25) 0px Y1 B1 -S1, rgba(0,0,0,0.1) 0px Y2 B2 -S2` where Y1/B1 are larger (far shadow) and Y2/B2 are smaller (near shadow)
-4. Heading color is `#061b31` (deep navy), body is `#64748d` (slate), labels are `#273951` (dark slate)
-5. Border-radius stays in the 4px-8px range -- never use pill shapes or large rounding
-6. Use `"tnum"` for any numbers in tables, charts, or financial displays
-7. Dark sections use `#1c1e54` -- not black, not gray, but a deep branded indigo
-8. SourceCodePro for code at 12px/500 with 2.00 line-height (very generous for readability)
+
+When refining existing screens generated with this design system:
+
+1. Focus on ONE component at a time — the system has few moving parts, so small refinements compound
+2. Reference specific color names and hex codes from this document when describing changes
+3. Use natural language ("sharper corners," "more generous vertical rhythm") alongside specific measurements
+4. When in doubt about radius, remember: 2px for form/utility buttons, 60px for editorial pills, 6px for cards, 50%/100% for icon and portrait circles
+5. Keep the brand rule absolute: only one Vodafone Red element should dominate any given fold
+
+### Known Gaps
+
+- Form input styles (text fields, dropdowns, toggles) are not exposed on these page templates; their specs are inferred from the ghost-button pattern and may need refinement when real forms are designed
+- The Vodafone corporate typeface is proprietary and cannot be reproduced exactly in open systems; Inter with tightened tracking at display sizes is the closest open substitute
+- Animation and transition timings are intentionally not documented — the site uses them sparingly and the values are not extractable from static analysis
+- The share ticker's exact number styling (separators, currency glyph) is documented from the investor-page screenshot; other regional variants may display differently
