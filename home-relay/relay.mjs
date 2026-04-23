@@ -1,26 +1,14 @@
 #!/usr/bin/env node
 // Home relay for jrjr.pl OCR counter.
-//
-// Runs on your home PC (Windows / macOS / Linux). Every N minutes:
-//   1. Opens a headless Chromium on YouTube via Playwright
-//   2. Screenshots the <video> element showing the donation widget
-//   3. POSTs the PNG to https://<vps>/api/internal/frame
-// The VPS does the OCR and updates the public counter. We avoid the
-// datacenter-IP block on YouTube because your home PC uses a normal
-// residential IP.
-//
-// First run:
-//   1. cp .env.example .env  (edit to match your VPS + secret)
-//   2. npm install
-//   3. npm run install-browsers
-//   4. npm start
-//
-// Keep this process running. On Windows you can add a shortcut to
-// start.cmd into shell:startup so it launches with the PC.
+// Runs on a residential-IP machine, so YouTube serves the player normally.
 
 import { chromium } from "playwright";
-import { readFileSync, existsSync } from "node:fs";
-import { mkdirSync, writeFileSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -51,6 +39,7 @@ const STREAM_URL =
   process.env.STREAM_URL || "https://www.youtube.com/live/UNAqqHIPbWA";
 const INTERVAL = Math.max(1, Number(process.env.INTERVAL_MINUTES) || 5);
 const WAIT_AFTER = Number(process.env.PLAYWRIGHT_WAIT || 4000);
+const DEBUG_DIR = process.env.DEBUG_DIR || join(process.cwd(), "debug");
 
 if (!VPS_URL || !SECRET) {
   console.error("[relay] VPS_URL and SESSION_SECRET must be set in .env");
@@ -64,6 +53,8 @@ function extractVideoId(url) {
     const parts = u.pathname.split("/").filter(Boolean);
     const liveIdx = parts.indexOf("live");
     if (liveIdx >= 0 && parts[liveIdx + 1]) return parts[liveIdx + 1];
+    const embedIdx = parts.indexOf("embed");
+    if (embedIdx >= 0 && parts[embedIdx + 1]) return parts[embedIdx + 1];
     const v = u.searchParams.get("v");
     if (v) return v;
   } catch {}
@@ -72,49 +63,169 @@ function extractVideoId(url) {
 
 const videoId = extractVideoId(STREAM_URL);
 if (!videoId) {
-  console.error("[relay] could not extract video id from STREAM_URL");
+  console.error("[relay] could not extract video id from STREAM_URL:", STREAM_URL);
   process.exit(2);
 }
 
-async function grabFrame(outPath) {
+function urlFor(strategy) {
+  if (strategy === "nocookie") {
+    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1`;
+  }
+  if (strategy === "embed") {
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
+  }
+  if (strategy === "watch") {
+    return `https://www.youtube.com/watch?v=${videoId}`;
+  }
+  return null;
+}
+
+async function dumpDebug(page, label, reason) {
+  try {
+    mkdirSync(DEBUG_DIR, { recursive: true });
+    const stamp = `${label}-${Date.now()}`;
+    const url = page.url();
+    await page.screenshot({ path: join(DEBUG_DIR, `${stamp}.png`), fullPage: true });
+    const html = await page.content();
+    writeFileSync(join(DEBUG_DIR, `${stamp}.html`), html);
+    writeFileSync(
+      join(DEBUG_DIR, `${stamp}.txt`),
+      `reason: ${reason}\nurl: ${url}\nrequested: ${STREAM_URL}\n`,
+    );
+    const sniff = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 300);
+    console.error(`[relay] debug saved to ${DEBUG_DIR}\\${stamp}.{png,html,txt}`);
+    console.error(`[relay] page URL: ${url}`);
+    console.error(`[relay] text sniff: ${sniff}`);
+  } catch (err) {
+    console.error(`[relay] debug dump failed: ${err.message}`);
+  }
+}
+
+async function grabFrameWithStrategies(outPath) {
+  const strategies = ["nocookie", "embed", "watch"];
   const browser = await chromium.launch({
     headless: true,
     args: [
-      "--autoplay-policy=no-user-gesture-required",
+      "--no-sandbox",
       "--disable-blink-features=AutomationControlled",
+      "--autoplay-policy=no-user-gesture-required",
     ],
   });
+  let lastError = null;
   try {
-    const context = await browser.newContext({
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      viewport: { width: 1280, height: 720 },
-      locale: "pl-PL",
-      timezoneId: "Europe/Warsaw",
-    });
+    for (const strategy of strategies) {
+      const target = urlFor(strategy);
+      const context = await browser.newContext({
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        viewport: { width: 1280, height: 720 },
+        locale: "pl-PL",
+        timezoneId: "Europe/Warsaw",
+      });
 
-    // youtube-nocookie embed → no GDPR wall, no sign-in nag.
-    const url = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1`;
-    const page = await context.newPage();
-    page.setDefaultTimeout(40_000);
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+      // Preemptive consent cookies — "I already clicked Accept All".
+      const consent = [".youtube.com", ".google.com", "www.youtube.com"].flatMap(
+        (domain) => [
+          {
+            name: "SOCS",
+            value: "CAISEwgBEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg",
+            domain,
+            path: "/",
+            secure: true,
+            httpOnly: false,
+            sameSite: "Lax",
+          },
+          {
+            name: "CONSENT",
+            value: "YES+cb",
+            domain,
+            path: "/",
+            secure: true,
+            httpOnly: false,
+            sameSite: "Lax",
+          },
+        ],
+      );
+      await context.addCookies(consent);
 
-    await page.waitForFunction(
-      () => {
-        const v = document.querySelector("video");
-        return v && v.videoWidth > 0 && v.videoHeight > 0;
-      },
-      null,
-      { timeout: 30_000 },
-    );
-    await page.waitForTimeout(WAIT_AFTER);
+      const page = await context.newPage();
+      page.setDefaultTimeout(30_000);
 
-    const videoHandle = await page.$("video");
-    if (videoHandle) {
-      await videoHandle.screenshot({ path: outPath });
-    } else {
-      await page.screenshot({ path: outPath, fullPage: false });
+      try {
+        console.log(`[relay] strategy=${strategy} → ${target}`);
+        await page.goto(target, { waitUntil: "domcontentloaded" });
+
+        // Try to click "Zaakceptuj wszystko" in any frame.
+        const tryClick = async (root) => {
+          const selectors = [
+            'button:has-text("Zaakceptuj wszystko")',
+            'button:has-text("Accept all")',
+            'button[aria-label*="Zaakceptuj" i]',
+            'button[aria-label*="accept all" i]',
+          ];
+          for (const sel of selectors) {
+            try {
+              await root.locator(sel).first().click({ timeout: 1200 });
+              return true;
+            } catch {}
+          }
+          return false;
+        };
+        if (await tryClick(page)) {
+          console.log("[relay] clicked consent 'Zaakceptuj wszystko'");
+          await page.waitForTimeout(1000);
+        } else {
+          for (const frame of page.frames()) {
+            if (await tryClick(frame)) {
+              console.log("[relay] clicked consent in iframe");
+              await page.waitForTimeout(1000);
+              break;
+            }
+          }
+        }
+
+        await Promise.race([
+          page.waitForFunction(
+            () => {
+              const v = document.querySelector("video");
+              return v && v.videoWidth > 0 && v.videoHeight > 0;
+            },
+            null,
+            { timeout: 25_000 },
+          ),
+          page
+            .waitForFunction(
+              () =>
+                /confirm you.?re not a bot|sign in to confirm|potwierdzić.*bot/i.test(
+                  document.body?.innerText || "",
+                ),
+              null,
+              { timeout: 25_000 },
+            )
+            .then(() => {
+              throw new Error("bot-check intercepted");
+            }),
+        ]);
+        await page.waitForTimeout(WAIT_AFTER);
+
+        const videoHandle = await page.$("video");
+        if (videoHandle) {
+          await videoHandle.screenshot({ path: outPath });
+        } else {
+          await page.screenshot({ path: outPath, fullPage: false });
+        }
+
+        console.log(`[relay] strategy=${strategy} OK`);
+        await context.close();
+        return;
+      } catch (err) {
+        lastError = err;
+        console.error(`[relay] strategy=${strategy} failed: ${err.message}`);
+        await dumpDebug(page, strategy, err.message).catch(() => {});
+        await context.close();
+      }
     }
+    throw lastError || new Error("all strategies exhausted");
   } finally {
     await browser.close();
   }
@@ -148,7 +259,7 @@ async function tick() {
   const pngPath = join(workDir, "frame.png");
   try {
     const t0 = Date.now();
-    await grabFrame(pngPath);
+    await grabFrameWithStrategies(pngPath);
     const grabbedIn = Date.now() - t0;
 
     const t1 = Date.now();
@@ -172,10 +283,6 @@ async function tick() {
     console.error(
       `[relay] ${new Date().toISOString()}  FAIL: ${err instanceof Error ? err.message : err}`,
     );
-  } finally {
-    try {
-      writeFileSync(join(workDir, ".cleanup"), ""); // no-op just to be defensive
-    } catch {}
   }
 }
 
