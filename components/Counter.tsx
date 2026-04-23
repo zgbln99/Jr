@@ -50,22 +50,25 @@ export function Counter({ initial }: { initial: CounterData }) {
         if (!res.ok) return;
         const next = (await res.json()) as CounterData;
         if (cancelled) return;
-        if (next.amount !== toRef.current) {
-          const prevAmount = toRef.current;
-          const crossed = millionsCrossed(prevAmount, next.amount);
+        // Frontend monotonic guard: we only ever animate upward. A lower
+        // value coming back from the API (DB restore, manual override to
+        // a smaller number, stale cache) is ignored so the visible count
+        // can never go backwards. Backend already enforces this for OCR;
+        // this is the second line of defence for the public view.
+        if (next.amount <= toRef.current) return;
 
-          fromRef.current = displayed;
-          toRef.current = next.amount;
-          startedRef.current = performance.now();
-          setBumped(true);
-          window.setTimeout(() => setBumped(false), 1600);
-          if (rafRef.current == null) animate();
+        const prevAmount = toRef.current;
+        const crossed = millionsCrossed(prevAmount, next.amount);
 
-          if (crossed > 0) {
-            // Fire once per crossing — a single donation big enough to
-            // skip two millions at once still only triggers one burst.
-            fireMilestoneConfetti().catch(() => {});
-          }
+        fromRef.current = displayed;
+        toRef.current = next.amount;
+        startedRef.current = performance.now();
+        setBumped(true);
+        window.setTimeout(() => setBumped(false), 1600);
+        if (rafRef.current == null) animate();
+
+        if (crossed > 0) {
+          fireMilestoneConfetti().catch(() => {});
         }
         setData(next);
       } catch {

@@ -65,20 +65,24 @@ export function WidgetCounter({
         if (!res.ok) return;
         const next = (await res.json()) as CounterData;
         if (cancelled) return;
-        if (next.amount !== toRef.current) {
-          const prevAmount = toRef.current;
-          const crossed = millionsCrossed(prevAmount, next.amount);
+        // Monotonic on the viewer side too — the widget is the thing
+        // that's broadcast into OBS overlays, so even a transient
+        // decrease in the API response (DB restore, manual override to
+        // a lower figure) is silently ignored. Viewer never sees a drop.
+        if (next.amount <= toRef.current) return;
 
-          fromRef.current = displayed;
-          toRef.current = next.amount;
-          startedRef.current = performance.now();
-          setPulse(true);
-          window.setTimeout(() => setPulse(false), 1800);
-          if (rafRef.current == null) animate();
+        const prevAmount = toRef.current;
+        const crossed = millionsCrossed(prevAmount, next.amount);
 
-          if (crossed > 0) {
-            fireMilestoneConfetti().catch(() => {});
-          }
+        fromRef.current = displayed;
+        toRef.current = next.amount;
+        startedRef.current = performance.now();
+        setPulse(true);
+        window.setTimeout(() => setPulse(false), 1800);
+        if (rafRef.current == null) animate();
+
+        if (crossed > 0) {
+          fireMilestoneConfetti().catch(() => {});
         }
       } catch {}
     }
