@@ -13,11 +13,25 @@ function sessionOptions(): SessionOptions {
       "SESSION_SECRET environment variable is required and must be at least 32 characters. See .env.example.",
     );
   }
+  // Only mark the cookie Secure when the site itself is served over HTTPS.
+  // On a fresh VPS before certbot, admins reach /admin over plain HTTP
+  // (http://<vps-ip>:8010), and a Secure cookie silently gets dropped by
+  // the browser — login "succeeds" on the wire but no session ever sticks,
+  // so /admin redirects them right back to /admin/login. Looks like a page
+  // refresh doing nothing. By keying off NEXT_PUBLIC_SITE_URL we stay safe
+  // once the real domain is wired up (https://jrjr.pl) while letting HTTP
+  // setup work too. COOKIE_INSECURE=true forces the non-secure path if you
+  // ever need to override (e.g. local dev served from next start).
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const secureCookie =
+    process.env.COOKIE_INSECURE === "true"
+      ? false
+      : siteUrl.startsWith("https://");
   return {
     password,
     cookieName: "jrjr_admin_session",
     cookieOptions: {
-      secure: process.env.NODE_ENV === "production",
+      secure: secureCookie,
       sameSite: "lax",
       httpOnly: true,
       path: "/",
