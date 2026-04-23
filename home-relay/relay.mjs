@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Home relay for jrjr.pl OCR counter.
 //
-// Strategy: launch Playwright ONCE at startup (and once per ~hour after
-// that) to intercept the HLS manifest URL YouTube's player fetches. That
-// URL is signed but stays valid for ~2 hours. Between refreshes, every
-// tick is just ffmpeg pulling a frame from the cached manifest URL and
-// uploading the JPEG to the VPS. That lets us run at 10-second cadence
-// without paying the 5–10 s browser cold-start cost each time.
+// Two-tier capture:
+//   FAST PATH — Playwright intercepts the live-stream manifest URL off
+//     the wire at startup (and every MANIFEST_REFRESH_MINUTES, or after
+//     ffmpeg fails twice). Subsequent ticks are just ffmpeg pulling a
+//     frame from the cached URL. Cheap, can run every 10 seconds.
+//   FALLBACK — if no manifest URL is intercepted within the timeout
+//     (YouTube changes URL patterns occasionally), just screenshot the
+//     <video> element on the Watch page and upload that. Slower per
+//     tick but guaranteed whenever the video is actually rendering.
 
 import { chromium } from "playwright";
 import ffmpegPath from "ffmpeg-static";
@@ -46,19 +49,16 @@ const SECRET = process.env.SESSION_SECRET || "";
 const STREAM_URL =
   process.env.STREAM_URL || "https://www.youtube.com/live/UNAqqHIPbWA";
 const DEBUG_DIR = process.env.DEBUG_DIR || join(process.cwd(), "debug");
+const DEBUG_REQUESTS = process.env.DEBUG_REQUESTS === "1";
 
-// Intervals: prefer INTERVAL_SECONDS for sub-minute polling. Falls back
-// to INTERVAL_MINUTES for old configs.
 const intervalMs = (() => {
   const secs = Number(process.env.INTERVAL_SECONDS);
   if (Number.isFinite(secs) && secs > 0) return Math.max(3000, secs * 1000);
   const mins = Number(process.env.INTERVAL_MINUTES);
   if (Number.isFinite(mins) && mins > 0) return mins * 60_000;
-  return 10_000; // default: 10 seconds
+  return 10_000;
 })();
 
-// Re-intercept the manifest after this long, OR on the first ffmpeg
-// failure (signed URLs expire in ~2h). 30 min is a comfortable margin.
 const MANIFEST_REFRESH_MS =
   Number(process.env.MANIFEST_REFRESH_MINUTES || 30) * 60_000;
 
@@ -112,10 +112,6 @@ function runCmd(cmd, args, { timeoutMs } = {}) {
   });
 }
 
-// Parse the `expire` query param out of an m3u8 manifest URL. YouTube
-// signs these with a unix-epoch expiry — once it passes, ffmpeg starts
-// returning 403. We use this to know when to re-intercept, without
-// waiting for the failure.
 function manifestExpiresAt(url) {
   const m = url.match(/\/expire\/(\d+)/);
   if (!m) return null;
@@ -124,7 +120,30 @@ function manifestExpiresAt(url) {
   return secs * 1000;
 }
 
-async function interceptManifest() {
+function isMediaUrl(u) {
+  // HLS live manifest:
+  //   manifest.googlevideo.com/api/manifest/hls_variant/.../file/index.m3u8
+  //   manifest.googlevideo.com/api/manifest/hls_playlist/...
+  // DASH manifest:
+  //   manifest.googlevideo.com/api/manifest/dash/...
+  // Direct progressive segment URLs:
+  //   rr*.sn-*.googlevideo.com/videoplayback?...
+  //   rr*.c.googlevideo.com/videoplayback?...
+  return (
+    /manifest\.googlevideo\.com\/api\/manifest\//i.test(u) ||
+    /\.googlevideo\.com\/videoplayback/i.test(u)
+  );
+}
+
+// Open Playwright, load the stream page, try to intercept a usable media
+// URL from the player's network traffic. If nothing usable shows up in
+// time, screenshot the <video> element and return a local JPEG instead.
+//
+// Return shape:
+//   { kind: "url", url }     → ffmpeg pulls a frame from this on each tick
+//   { kind: "screenshot",    → we already have the frame, use it directly
+//     bytes }                   this tick; next tick re-invokes Playwright
+async function captureFrameOrUrl(outJpegPath) {
   const browser = await chromium.launch({
     headless: true,
     args: [
@@ -142,7 +161,6 @@ async function interceptManifest() {
       timezoneId: "Europe/Warsaw",
     });
 
-    // Preset consent cookies so the player JS isn't gated by the dialog.
     const consent = [".youtube.com", ".google.com", "www.youtube.com"].flatMap(
       (domain) => [
         { name: "SOCS", value: "CAISEwgBEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg", domain, path: "/", secure: true, httpOnly: false, sameSite: "Lax" },
@@ -154,15 +172,17 @@ async function interceptManifest() {
     const page = await context.newPage();
     page.setDefaultTimeout(25_000);
 
-    let manifestUrl = null;
+    let capturedUrl = null;
+    const googlevideoSeen = [];
     page.on("request", (req) => {
       const u = req.url();
-      if (
-        /manifest\.googlevideo\.com\/api\/manifest\/hls/i.test(u) &&
-        /\.m3u8(?:\?|$)/.test(u) &&
-        !manifestUrl
-      ) {
-        manifestUrl = u;
+      if (/googlevideo\.com/i.test(u)) {
+        googlevideoSeen.push(u);
+        if (DEBUG_REQUESTS) console.log("[req]", u.slice(0, 180));
+        if (!capturedUrl && isMediaUrl(u)) {
+          capturedUrl = u;
+          console.log(`[relay] intercepted: ${u.slice(0, 140)}...`);
+        }
       }
     });
 
@@ -173,39 +193,71 @@ async function interceptManifest() {
     ];
 
     for (const target of targets) {
-      if (manifestUrl) break;
+      if (capturedUrl) break;
       try {
         await page.goto(target, { waitUntil: "domcontentloaded", timeout: 15_000 });
       } catch {}
-      // Best-effort consent click
       try {
         await page
           .locator('button:has-text("Zaakceptuj wszystko"), button:has-text("Accept all")')
           .first()
           .click({ timeout: 1500 });
       } catch {}
-      const deadline = Date.now() + 15_000;
-      while (!manifestUrl && Date.now() < deadline) {
+      const deadline = Date.now() + 12_000;
+      while (!capturedUrl && Date.now() < deadline) {
         await page.waitForTimeout(200);
       }
     }
 
-    if (!manifestUrl) {
-      try {
-        mkdirSync(DEBUG_DIR, { recursive: true });
-        const stamp = `no-manifest-${Date.now()}`;
-        await page.screenshot({ path: join(DEBUG_DIR, `${stamp}.png`), fullPage: true });
-        writeFileSync(join(DEBUG_DIR, `${stamp}.html`), await page.content());
-        console.error(`[relay] debug saved to ${DEBUG_DIR}`);
-      } catch {}
+    if (capturedUrl) {
+      return { kind: "url", url: capturedUrl };
     }
-    return manifestUrl;
+
+    // --- FALLBACK: no media URL intercepted, try to screenshot the video
+    // element directly. This works whenever the <video> is actually
+    // rendering pixels, which — per the debug artifact — it is.
+    console.warn(
+      `[relay] no media URL intercepted (saw ${googlevideoSeen.length} googlevideo requests), falling back to <video> screenshot`,
+    );
+    try {
+      await page.waitForFunction(
+        () => {
+          const v = document.querySelector("video");
+          return v && v.videoWidth > 0 && v.videoHeight > 0;
+        },
+        null,
+        { timeout: 10_000 },
+      );
+      const handle = await page.$("video");
+      if (handle) {
+        await handle.screenshot({ path: outJpegPath, type: "jpeg", quality: 80 });
+        console.log("[relay] captured <video> element screenshot directly");
+        return { kind: "screenshot" };
+      }
+    } catch (err) {
+      console.warn(`[relay] <video> screenshot failed: ${err.message}`);
+    }
+
+    // Nothing worked — dump a full debug artifact.
+    try {
+      mkdirSync(DEBUG_DIR, { recursive: true });
+      const stamp = `no-manifest-${Date.now()}`;
+      await page.screenshot({ path: join(DEBUG_DIR, `${stamp}.png`), fullPage: true });
+      writeFileSync(join(DEBUG_DIR, `${stamp}.html`), await page.content());
+      writeFileSync(
+        join(DEBUG_DIR, `${stamp}.txt`),
+        `googlevideo requests seen (${googlevideoSeen.length}):\n` +
+          googlevideoSeen.slice(0, 50).join("\n"),
+      );
+      console.error(`[relay] debug saved to ${DEBUG_DIR}`);
+    } catch {}
+    return { kind: "none" };
   } finally {
     await browser.close();
   }
 }
 
-async function ffmpegGrabFrame(manifestUrl, outPath) {
+async function ffmpegGrabFrame(mediaUrl, outPath) {
   await runCmd(
     ffmpegPath,
     [
@@ -213,7 +265,7 @@ async function ffmpegGrabFrame(manifestUrl, outPath) {
       "-loglevel", "error",
       "-y",
       "-rw_timeout", "15000000",
-      "-i", manifestUrl,
+      "-i", mediaUrl,
       "-frames:v", "1",
       "-q:v", "3",
       outPath,
@@ -242,29 +294,40 @@ async function uploadFrame(pngPath) {
   }
 }
 
-// ----- Cached manifest URL state -----
-let cachedManifest = null;
+// Cached state
+let cachedUrl = null;
 let cachedExpiresAt = 0;
 let consecutiveFfmpegFails = 0;
 
-async function ensureManifest(force = false) {
+async function ensureUrl(force, outJpegPath) {
   const now = Date.now();
-  const cacheExpired = now > cachedExpiresAt - 60_000; // 1 min safety margin
-  if (!force && cachedManifest && !cacheExpired) return cachedManifest;
+  const cacheExpired = now > cachedExpiresAt - 60_000;
+  if (!force && cachedUrl && !cacheExpired) {
+    return { kind: "url", url: cachedUrl };
+  }
 
-  console.log(`[relay] refreshing manifest URL (force=${force}, cacheExpired=${cacheExpired})`);
+  console.log(
+    `[relay] refreshing media URL (force=${force}, cacheExpired=${cacheExpired})`,
+  );
   const t0 = Date.now();
-  const url = await interceptManifest();
-  if (!url) throw new Error("could not intercept m3u8 manifest");
-  cachedManifest = url;
-  const signedExpiry = manifestExpiresAt(url);
-  const maxAgeExpiry = now + MANIFEST_REFRESH_MS;
-  cachedExpiresAt = Math.min(signedExpiry ?? Infinity, maxAgeExpiry);
-  consecutiveFfmpegFails = 0;
-  const ms = Date.now() - t0;
-  const validForMin = Math.round((cachedExpiresAt - now) / 60_000);
-  console.log(`[relay] new manifest intercepted in ${ms}ms, valid for ~${validForMin} min`);
-  return cachedManifest;
+  const result = await captureFrameOrUrl(outJpegPath);
+  if (result.kind === "none") throw new Error("could not capture media URL or frame");
+  if (result.kind === "url") {
+    cachedUrl = result.url;
+    const signedExpiry = manifestExpiresAt(result.url);
+    const maxAgeExpiry = now + MANIFEST_REFRESH_MS;
+    cachedExpiresAt = Math.min(signedExpiry ?? Infinity, maxAgeExpiry);
+    consecutiveFfmpegFails = 0;
+    const ms = Date.now() - t0;
+    const validForMin = Math.round((cachedExpiresAt - now) / 60_000);
+    console.log(`[relay] new URL intercepted in ${ms}ms, valid for ~${validForMin} min`);
+  } else {
+    // screenshot fallback — no cacheable URL this cycle
+    cachedUrl = null;
+    cachedExpiresAt = 0;
+    console.log(`[relay] screenshot fallback used (took ${Date.now() - t0}ms)`);
+  }
+  return result;
 }
 
 async function tick() {
@@ -273,34 +336,40 @@ async function tick() {
   const framePath = join(workDir, "frame.jpg");
 
   try {
-    let manifestUrl = await ensureManifest(false);
+    const result = await ensureUrl(false, framePath);
 
-    const t1 = Date.now();
-    try {
-      await ffmpegGrabFrame(manifestUrl, framePath);
-    } catch (err) {
-      consecutiveFfmpegFails += 1;
-      console.warn(
-        `[relay] ffmpeg failed (${consecutiveFfmpegFails}/3): ${err.message}`,
-      );
-      if (consecutiveFfmpegFails >= 2) {
-        // Assume manifest expired / rotated — force refresh and retry once.
-        manifestUrl = await ensureManifest(true);
-        await ffmpegGrabFrame(manifestUrl, framePath);
-      } else {
-        throw err;
+    if (result.kind === "url") {
+      // Fast path: use cached URL + ffmpeg
+      const t1 = Date.now();
+      try {
+        await ffmpegGrabFrame(cachedUrl, framePath);
+      } catch (err) {
+        consecutiveFfmpegFails += 1;
+        console.warn(
+          `[relay] ffmpeg failed (${consecutiveFfmpegFails}/2): ${err.message}`,
+        );
+        if (consecutiveFfmpegFails >= 2) {
+          const refreshed = await ensureUrl(true, framePath);
+          if (refreshed.kind === "url") {
+            await ffmpegGrabFrame(cachedUrl, framePath);
+          }
+          // If refreshed.kind === "screenshot", the file is already written.
+        } else {
+          throw err;
+        }
       }
+      const ffmpegMs = Date.now() - t1;
+      const t2 = Date.now();
+      const apiResult = await uploadFrame(framePath);
+      const uploadMs = Date.now() - t2;
+      logTick(ffmpegMs, uploadMs, apiResult, "ffmpeg");
+    } else {
+      // Slow path: Playwright already wrote the screenshot, just upload
+      const t2 = Date.now();
+      const apiResult = await uploadFrame(framePath);
+      const uploadMs = Date.now() - t2;
+      logTick(0, uploadMs, apiResult, "browser");
     }
-    const ffmpegMs = Date.now() - t1;
-
-    const t2 = Date.now();
-    const result = await uploadFrame(framePath);
-    const uploadMs = Date.now() - t2;
-
-    const sum =
-      result.sum != null ? `${result.sum.toFixed(2)} PLN` : result.ocr || "?";
-    const stamp = new Date().toISOString().slice(11, 19);
-    console.log(`[relay] ${stamp}  ff=${ffmpegMs}ms up=${uploadMs}ms  ${sum}`);
   } catch (err) {
     console.error(
       `[relay] FAIL: ${err instanceof Error ? err.message : err}`,
@@ -308,16 +377,20 @@ async function tick() {
   }
 }
 
-// ----- Boot -----
+function logTick(ffmpegMs, uploadMs, apiResult, path) {
+  const sum =
+    apiResult.sum != null ? `${apiResult.sum.toFixed(2)} PLN` : apiResult.ocr || "?";
+  const stamp = new Date().toISOString().slice(11, 19);
+  const timings = ffmpegMs ? `ff=${ffmpegMs}ms up=${uploadMs}ms` : `up=${uploadMs}ms`;
+  console.log(`[relay] ${stamp}  [${path}] ${timings}  ${sum}`);
+}
+
 console.log(
   `[relay] starting · VPS=${VPS_URL} · stream=${STREAM_URL} · interval=${(intervalMs / 1000).toFixed(0)}s`,
 );
 
-// Run the first tick, which also lazily intercepts the manifest.
 await tick();
 
-// Steady-state loop. We use setTimeout chains (not setInterval) so a slow
-// tick can't pile up — we always wait a full interval after each finishes.
 (async function loop() {
   while (true) {
     await new Promise((r) => setTimeout(r, intervalMs));
