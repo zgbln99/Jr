@@ -17,35 +17,47 @@ export function Navbar({ donationUrl }: { donationUrl?: string }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 32);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const dark = !scrolled; // transparent nav over hero → white text
+
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-colors ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-200 ${
         scrolled
-          ? "bg-white/80 nav-blur border-b border-stripe-border"
+          ? "bg-white border-b border-black/5"
           : "bg-transparent"
       }`}
     >
-      <nav className="max-w-[1180px] mx-auto px-6 h-16 flex items-center justify-between">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-stripe-navy text-[15px] font-normal tracking-tight"
-        >
-          <span className="inline-block h-6 w-6 rounded-[6px] bg-gradient-to-br from-stripe-purple to-stripe-ruby" />
-          <span>jrjr.pl</span>
+      <nav className="max-w-[1440px] mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-3">
+          {/* VF speech-mark-inspired red dot */}
+          <span className="relative inline-block h-9 w-9 rounded-full bg-vf-red">
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white" />
+          </span>
+          <span
+            className={`font-bold text-[15px] tracking-wider uppercase ${
+              dark ? "text-white" : "text-vf-charcoal"
+            }`}
+          >
+            jrjr.pl
+          </span>
         </Link>
 
-        <ul className="hidden md:flex items-center gap-7">
+        <ul className="hidden md:flex items-center gap-8">
           {NAV_LINKS.map((l) => (
             <li key={l.href}>
               <a
                 href={l.href}
-                className="text-[14px] text-stripe-navy hover:text-stripe-purple transition-colors"
+                className={`text-[15px] font-medium transition-colors ${
+                  dark
+                    ? "text-white/90 hover:text-white"
+                    : "text-vf-charcoal hover:text-vf-red"
+                }`}
               >
                 {l.label}
               </a>
@@ -59,29 +71,24 @@ export function Navbar({ donationUrl }: { donationUrl?: string }) {
               href={donationUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center px-4 h-9 rounded-[4px] bg-stripe-purple text-white text-[14px] font-normal hover:bg-stripe-purple-hover transition-colors"
+              className="hidden sm:inline-flex items-center h-10 px-5 rounded-full bg-vf-red text-white text-[13px] font-bold uppercase tracking-wider hover:bg-[#b80000] transition-colors"
             >
-              Wpłać teraz
+              Wpłać
             </a>
           ) : null}
           <button
             aria-label="Menu"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-[6px] border border-stripe-border text-stripe-navy"
+            className={`md:hidden inline-flex items-center justify-center h-10 w-10 rounded-[2px] border ${
+              dark ? "border-white/30 text-white" : "border-vf-charcoal/30 text-vf-charcoal"
+            }`}
           >
-            <span className="sr-only">Menu</span>
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 18 18"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
-                d="M2 5h14M2 9h14M2 13h14"
+                d="M3 5h14M3 10h14M3 15h14"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="1.75"
                 strokeLinecap="round"
               />
             </svg>
@@ -90,13 +97,13 @@ export function Navbar({ donationUrl }: { donationUrl?: string }) {
       </nav>
 
       {open ? (
-        <div className="md:hidden border-t border-stripe-border bg-white">
-          <ul className="px-6 py-4 flex flex-col gap-4">
+        <div className="md:hidden bg-white border-t border-black/5">
+          <ul className="px-6 py-5 flex flex-col gap-5">
             {NAV_LINKS.map((l) => (
               <li key={l.href}>
                 <a
                   href={l.href}
-                  className="text-[15px] text-stripe-navy"
+                  className="text-[17px] text-vf-charcoal font-medium"
                   onClick={() => setOpen(false)}
                 >
                   {l.label}
@@ -109,9 +116,9 @@ export function Navbar({ donationUrl }: { donationUrl?: string }) {
                   href={donationUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 h-9 rounded-[4px] bg-stripe-purple text-white text-[14px]"
+                  className="inline-flex items-center h-11 px-5 rounded-full bg-vf-red text-white text-[14px] font-bold uppercase tracking-wider"
                 >
-                  Wpłać teraz
+                  Wpłać
                 </a>
               </li>
             ) : null}

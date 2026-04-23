@@ -31,42 +31,41 @@ function MentionCard({ item }: { item: MediaMention }) {
       href={item.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex flex-col rounded-[8px] border border-stripe-border bg-white overflow-hidden shadow-stripe-soft hover:shadow-stripe-elevated transition-shadow"
+      className="group vf-card border border-black/5 flex flex-col"
     >
-      <div className="aspect-[16/9] relative bg-gradient-to-br from-stripe-purple-soft to-stripe-magenta-light overflow-hidden">
+      <div className="aspect-[16/9] relative bg-vf-neutral overflow-hidden">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image}
             alt=""
             loading="lazy"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-stripe-purple-deep text-[15px] uppercase tracking-[0.14em] font-light px-4 text-center">
+          <div className="h-full w-full flex items-center justify-center text-[18px] uppercase tracking-wider font-bold text-vf-body text-center px-6">
             {item.outlet}
           </div>
         )}
       </div>
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-stripe-purple">
-          <span>{item.outlet}</span>
+      <div className="p-5 md:p-6 flex-1 flex flex-col">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="eyebrow text-vf-red">{item.outlet}</span>
           {host && host.toLowerCase() !== item.outlet.toLowerCase() ? (
             <>
-              <span className="text-stripe-body/50">·</span>
-              <span className="text-stripe-body normal-case tracking-normal">{host}</span>
+              <span className="text-vf-body/50 text-[11px]">·</span>
+              <span className="text-vf-body text-[11px] normal-case tracking-normal">
+                {host}
+              </span>
             </>
           ) : null}
         </div>
-        <h3
-          className="mt-2 text-stripe-navy font-light"
-          style={{ fontSize: "1.125rem", lineHeight: 1.3, letterSpacing: "-0.01em" }}
-        >
+        <h3 className="text-[19px] font-bold text-vf-charcoal leading-tight tracking-tight">
           {item.title}
         </h3>
-        <div className="mt-auto pt-4 flex items-center justify-between text-[12px] text-stripe-body tnum">
-          <span>{dateLabel ?? ""}</span>
-          <span className="text-stripe-purple group-hover:text-stripe-purple-hover">
+        <div className="mt-auto pt-5 flex items-center justify-between text-[12px] tnum">
+          <span className="text-vf-body">{dateLabel ?? ""}</span>
+          <span className="text-vf-red font-bold uppercase tracking-wider group-hover:underline">
             Czytaj →
           </span>
         </div>
@@ -82,9 +81,9 @@ export function Media({ items }: { items: MediaMention[] }) {
       id="media"
       eyebrow="Media o akcji"
       title="Piszą i mówią o nas"
-      intro="Redakcje i twórcy, którzy nagłaśniają zbiórkę. Jeśli chcesz napisać o akcji, daj znać."
+      intro="Redakcje i twórcy, którzy nagłaśniają zbiórkę. Chcesz napisać o akcji? Daj znać."
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {items.map((item) => (
           <MentionCard key={item.id} item={item} />
         ))}

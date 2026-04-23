@@ -24,10 +24,10 @@ export function LiveEmbed({ streamUrl }: { streamUrl: string }) {
     <Section
       id="live"
       eyebrow="Live"
-      title="Transmisja trwa 24/7"
-      intro="Stream leci nieprzerwanie przez 9 dni. Włącz w tle, zostaw polubienie, udostępnij dalej — każda aktywność to zasięg dla akcji."
+      title="Transmisja 24/7"
+      intro="Stream leci nieprzerwanie przez 9 dni. Włącz w tle, zostaw polubienie, udostępnij — zasięg to realna pomoc."
     >
-      <div className="rounded-[8px] overflow-hidden border border-stripe-border shadow-stripe-elevated bg-black">
+      <div className="vf-card border border-black/5 overflow-hidden bg-black">
         {id ? (
           <div className="relative pb-[56.25%] h-0">
             <iframe

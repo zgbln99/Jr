@@ -31,17 +31,19 @@ export function Countdown({ endsAt }: { endsAt: string | null }) {
   const finished = end - now <= 0;
 
   return (
-    <div className="inline-flex items-center gap-3 px-4 py-2 rounded-[8px] bg-white/10 border border-white/15 backdrop-blur">
-      <span className="text-white/70 text-[11px] uppercase tracking-[0.12em]">
-        {finished ? "Transmisja zakończona" : "Koniec transmisji za"}
-      </span>
-      {!finished ? (
-        <span className="tnum text-white text-[14px] font-normal">
-          {parts.days}d {String(parts.hours).padStart(2, "0")}:
-          {String(parts.minutes).padStart(2, "0")}:
-          {String(parts.seconds).padStart(2, "0")}
-        </span>
-      ) : null}
-    </div>
+    <span className="inline-flex items-center gap-2 px-3 py-1 border border-white/30 rounded-full text-white/90 text-[11px] font-bold uppercase tracking-[0.14em]">
+      {finished ? (
+        "Transmisja zakończona"
+      ) : (
+        <>
+          Koniec za{" "}
+          <span className="tnum">
+            {parts.days}d {String(parts.hours).padStart(2, "0")}:
+            {String(parts.minutes).padStart(2, "0")}:
+            {String(parts.seconds).padStart(2, "0")}
+          </span>
+        </>
+      )}
+    </span>
   );
 }

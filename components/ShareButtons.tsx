@@ -8,7 +8,7 @@ export function ShareButtons({ url }: { url: string }) {
   const tweetHref =
     "https://twitter.com/intent/tweet?text=" +
     encodeURIComponent(
-      "Łatwogang x Bedoes x Cancer Fighters — 9 dni transmisji na rzecz dzieci chorych na raka. Dołącz:",
+      "Łatwogang × Bedoes × Cancer Fighters — 9 dni transmisji na rzecz dzieci chorych na raka. Dołącz:",
     ) +
     "&url=" +
     encodeURIComponent(url);
@@ -26,20 +26,16 @@ export function ShareButtons({ url }: { url: string }) {
   }
 
   return (
-    <div className="mt-5 flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-3">
       <a
         href={tweetHref}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center h-9 px-3 rounded-[4px] border border-stripe-purple-light text-stripe-purple text-[13px] hover:bg-stripe-purple/5"
+        className="btn-rect-ghost"
       >
         Wrzuć na X
       </a>
-      <button
-        type="button"
-        onClick={copy}
-        className="inline-flex items-center h-9 px-3 rounded-[4px] border border-stripe-purple-light text-stripe-purple text-[13px] hover:bg-stripe-purple/5"
-      >
+      <button type="button" onClick={copy} className="btn-rect-ghost">
         {copied ? "Skopiowane" : "Skopiuj link"}
       </button>
     </div>

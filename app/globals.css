@@ -3,77 +3,222 @@
 @tailwind utilities;
 
 :root {
-  --color-bg: #ffffff;
-  --color-heading: #061b31;
-  --color-body: #64748d;
-  --color-label: #273951;
-  --color-border: #e5edf5;
-  --color-purple: #533afd;
-  --color-purple-hover: #4434d4;
-  --color-brand-dark: #1c1e54;
+  --vf-red: #e60000;
+  --vf-red-dark: #ac1811;
+  --vf-charcoal: #25282b;
+  --vf-body: #7e7e7e;
+  --vf-form: #333333;
+  --vf-disabled: #bebebe;
+  --vf-neutral: #f2f2f2;
+  --vf-link: #3860be;
 }
 
 html,
 body {
-  background: var(--color-bg);
-  color: var(--color-heading);
-  font-feature-settings: "ss01";
+  background: #ffffff;
+  color: var(--vf-charcoal);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
 body {
-  font-weight: 300;
-  line-height: 1.4;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
+/* Display type — tight, huge, uppercase */
+.display {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+
+/* Tabular numerals for money */
 .tnum {
-  font-feature-settings: "tnum", "ss01";
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
-/* Selection */
+/* Selection — red */
 ::selection {
-  background: #b9b9f9;
-  color: #1c1e54;
+  background: var(--vf-red);
+  color: #ffffff;
 }
 
-/* Focus ring per DESIGN-stripe.md */
+/* Focus ring — red */
 :focus-visible {
-  outline: 2px solid #533afd;
+  outline: 2px solid var(--vf-red);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
-/* Sticky nav backdrop */
-.nav-blur {
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
+/* Red chapter band — full-width red stripe between sections */
+.red-band {
+  background: var(--vf-red);
+  height: 48px;
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .red-band {
+    height: 64px;
+  }
 }
 
-/* Ruby/magenta gradient text */
-.gradient-text {
-  background: linear-gradient(135deg, #ea2261 0%, #f96bee 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+/* Inline text links (editorial body) */
+.vf-link {
+  color: var(--vf-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.vf-link:hover {
+  color: var(--vf-red);
 }
 
-/* Section heading defaults */
-h1, h2, h3, h4 {
-  color: var(--color-heading);
-  font-weight: 300;
-  letter-spacing: -0.01em;
+/* Eyebrow / uppercase label */
+.eyebrow {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 12px;
 }
 
-/* Smooth counter transitions */
-.counter-digit {
-  display: inline-block;
-  font-variant-numeric: tabular-nums;
+/* Link hover — no underline default on nav links */
+a {
+  color: inherit;
 }
 
-/* Hero gradient bottom fade into white */
-.hero-fade {
-  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+/* Pill button primary — Vodafone red filled */
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  padding: 0 28px;
+  border-radius: 9999px;
+  background: var(--vf-red);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+.btn-pill:hover {
+  background: #b80000;
+}
+.btn-pill:active {
+  transform: translateY(1px);
+}
+
+/* Pill button ghost — transparent with white outline for dark heroes */
+.btn-pill-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  padding: 0 28px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: background-color 160ms ease;
+}
+.btn-pill-ghost:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Rect button — utility, 2px radius */
+.btn-rect {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 2px;
+  background: var(--vf-red);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: background-color 160ms ease;
+}
+.btn-rect:hover {
+  background: #b80000;
+}
+
+.btn-rect-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 2px;
+  background: #ffffff;
+  color: var(--vf-form);
+  border: 1px solid var(--vf-form);
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  transition: background-color 160ms ease;
+}
+.btn-rect-ghost:hover {
+  background: var(--vf-neutral);
+}
+
+/* Tag pills */
+.tag-outlined {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--vf-red);
+  color: var(--vf-charcoal);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 2px;
+}
+.tag-neutral {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: var(--vf-neutral);
+  color: var(--vf-charcoal);
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Card — white, 6px radius, no shadow */
+.vf-card {
+  background: #ffffff;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Asymmetric card — single rounded corner (top-right) as VF signature */
+.vf-card-corner {
+  background: #ffffff;
+  border-radius: 0 6px 0 0;
+  overflow: hidden;
+}
+
+/* Section reset */
+section {
+  position: relative;
+}
+
+/* Smooth scroll for anchor nav */
+html {
+  scroll-behavior: smooth;
 }

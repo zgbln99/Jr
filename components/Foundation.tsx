@@ -16,6 +16,7 @@ export function Foundation({
       title="Dokąd trafiają pieniądze"
       intro={text}
       dark
+      band
     >
       <div className="flex flex-wrap gap-3">
         {url ? (
@@ -23,7 +24,7 @@ export function Foundation({
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center h-10 px-4 rounded-[4px] bg-white text-stripe-navy text-[14px] hover:bg-stripe-border transition-colors"
+            className="btn-pill"
           >
             Strona fundacji
           </a>
@@ -33,7 +34,7 @@ export function Foundation({
             href={instagram}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center h-10 px-4 rounded-[4px] border border-white/20 text-white text-[14px] hover:bg-white/5 transition-colors"
+            className="btn-pill-ghost"
           >
             Instagram fundacji
           </a>
