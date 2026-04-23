@@ -145,9 +145,11 @@ async function tick() {
       const result =
         source === "scrape"
           ? await tickScrape()
-          : source === "ocr"
-            ? await tickOcr()
-            : { amounts: [], note: `unknown source: ${source}` };
+          : source === "playwright"
+            ? await tickFrameOcr("playwright")
+            : source === "ocr"
+              ? await tickFrameOcr("ytdlp")
+              : { amounts: [], note: `unknown source: ${source}` };
       if (result.amounts.length > 0) {
         const sum = result.amounts.reduce((s, v) => s + v, 0);
         console.log(
@@ -189,14 +191,22 @@ async function tickScrape() {
   return { amounts, note: notes.join(" + ") };
 }
 
-// ---- Source 2: OCR the YouTube stream widget ----
+// ---- Source 2/3: OCR the YouTube stream widget ----
+//
+// `grabber` picks how we capture the frame:
+//   "ytdlp"      → yt-dlp -g → ffmpeg (blocked on VPS IPs in 2026)
+//   "playwright" → headless Chromium → screenshot the <video> element
 
-async function tickOcr() {
+async function tickFrameOcr(grabber) {
   const workDir = mkdtempSync(join(tmpdir(), "jrjr-ocr-"));
   try {
-    const framePath = join(workDir, "frame.jpg");
+    const framePath = join(workDir, grabber === "playwright" ? "frame.png" : "frame.jpg");
 
-    await grabFrame(STREAM_URL, framePath);
+    if (grabber === "playwright") {
+      await grabFramePlaywright(STREAM_URL, framePath);
+    } else {
+      await grabFrame(STREAM_URL, framePath);
+    }
 
     // Mirror the frame into data/last-frame.jpg for the admin calibration UI.
     try {
@@ -253,7 +263,7 @@ async function tickOcr() {
       seen.add(key);
       picked.push(n);
     }
-    return { amounts: picked, note: "ocr" };
+    return { amounts: picked, note: `${grabber}-ocr` };
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
@@ -306,6 +316,16 @@ async function grabFrame(streamUrl, outPath) {
     "-i", mediaUrl,
     "-frames:v", "1",
     "-q:v", "2",
+    outPath,
+  ]);
+}
+
+async function grabFramePlaywright(streamUrl, outPath) {
+  // Delegate to scripts/playwright-grab.mjs so a hung browser process
+  // can't take down the worker — we spawn a fresh node per tick.
+  await run("node", [
+    resolve(dirname(new URL(import.meta.url).pathname), "playwright-grab.mjs"),
+    streamUrl,
     outPath,
   ]);
 }
