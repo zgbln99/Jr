@@ -27,9 +27,15 @@ function formatRelative(ts: number | null): string {
   return `${days} dni temu`;
 }
 
+// Polls /api/counter every 10 s so the headline number stays near-real-time
+// while Łatwogang is streaming. Animates whenever the backend reports a
+// different value.
+const POLL_MS = 10_000;
+
 export function Counter({ initial }: { initial: CounterData }) {
   const [data, setData] = useState<CounterData>(initial);
   const [displayed, setDisplayed] = useState<number>(initial.amount);
+  const [bumped, setBumped] = useState(false);
   const rafRef = useRef<number | null>(null);
   const fromRef = useRef<number>(0);
   const toRef = useRef<number>(initial.amount);
@@ -47,6 +53,8 @@ export function Counter({ initial }: { initial: CounterData }) {
           fromRef.current = displayed;
           toRef.current = next.amount;
           startedRef.current = performance.now();
+          setBumped(true);
+          window.setTimeout(() => setBumped(false), 1600);
           if (rafRef.current == null) animate();
         }
         setData(next);
@@ -54,7 +62,7 @@ export function Counter({ initial }: { initial: CounterData }) {
         /* keep last value */
       }
     }
-    const id = window.setInterval(tick, 30_000);
+    const id = window.setInterval(tick, POLL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -69,11 +77,8 @@ export function Counter({ initial }: { initial: CounterData }) {
       const t = Math.min(1, (now - startedRef.current) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
       setDisplayed(fromRef.current + (toRef.current - fromRef.current) * eased);
-      if (t < 1) {
-        rafRef.current = requestAnimationFrame(step);
-      } else {
-        rafRef.current = null;
-      }
+      if (t < 1) rafRef.current = requestAnimationFrame(step);
+      else rafRef.current = null;
     };
     rafRef.current = requestAnimationFrame(step);
   }
@@ -86,17 +91,20 @@ export function Counter({ initial }: { initial: CounterData }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const stale = data.updatedAt ? Date.now() - data.updatedAt > 15 * 60_000 : true;
+  const stale = data.updatedAt ? Date.now() - data.updatedAt > 10 * 60_000 : true;
 
   return (
     <div className="flex flex-col items-center">
       <div
-        className="display tnum text-white text-center leading-none"
+        className={`display tnum text-white text-center leading-none transition-[text-shadow] duration-500 ${
+          bumped ? "text-shadow-glow" : ""
+        }`}
         style={{
           fontSize: "clamp(3.5rem, 16vw, 11rem)",
           letterSpacing: "-0.04em",
-          // A tiny horizontal nudge because the zł currency symbol optically
-          // pulls the number off-centre on wide displays.
+          textShadow: bumped
+            ? "0 0 40px rgba(230,0,0,0.55), 0 0 12px rgba(255,255,255,0.2)"
+            : "0 0 0 rgba(230,0,0,0)",
         }}
       >
         {formatPLN(Math.round(displayed))}
@@ -105,7 +113,7 @@ export function Counter({ initial }: { initial: CounterData }) {
       <div className="mt-5 inline-flex items-center gap-2.5 text-white/70 text-[12px] uppercase tracking-[0.08em]">
         <span
           className={`inline-block h-2 w-2 rounded-full ${
-            stale ? "bg-yellow-400" : "bg-green-500"
+            stale ? "bg-yellow-400" : "bg-green-500 animate-pulse"
           }`}
           aria-hidden
         />

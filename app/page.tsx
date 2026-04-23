@@ -1,10 +1,5 @@
-import {
-  getAllSettings,
-  getLatestCounter,
-} from "@/lib/db";
-import { Navbar } from "@/components/Navbar";
+import { getAllSettings, getLatestCounter } from "@/lib/db";
 import { Hero } from "@/components/Hero";
-import { Footer } from "@/components/Footer";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +15,8 @@ function extractYoutubeId(url: string): string | null {
     if (liveIdx >= 0 && parts[liveIdx + 1]) return parts[liveIdx + 1];
     const v = u.searchParams.get("v");
     if (v) return v;
-    return null;
-  } catch {
-    return null;
-  }
+  } catch {}
+  return null;
 }
 
 export default function Home() {
@@ -37,29 +30,28 @@ export default function Home() {
   };
 
   const donations = [
-    { url: settings.donation_url_1, label: settings.donation_label_1 || "Zrzutka 1" },
-    { url: settings.donation_url_2, label: settings.donation_label_2 || "Zrzutka 2" },
+    {
+      url: settings.donation_url_1,
+      label: settings.donation_label_1 || "Tipply",
+    },
+    {
+      url: settings.donation_url_2,
+      label: settings.donation_label_2 || "Siepomaga",
+    },
   ].filter((d) => d.url);
 
-  const primaryDonation = donations[0] ?? null;
   const videoId = extractYoutubeId(STREAM_URL);
   const thumbnail = videoId
     ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
     : "https://i.ytimg.com/vi/UNAqqHIPbWA/maxresdefault.jpg";
 
   return (
-    <>
-      <Navbar donationUrl={primaryDonation?.url} />
-      <main>
-        <Hero
-          thumbnailUrl={thumbnail}
-          streamUrl={STREAM_URL}
-          donation={primaryDonation}
-          counter={counter}
-          countdownEnd={settings.stream_end_iso || null}
-        />
-      </main>
-      <Footer foundationUrl={settings.foundation_url || undefined} />
-    </>
+    <Hero
+      thumbnailUrl={thumbnail}
+      streamUrl={STREAM_URL}
+      donations={donations}
+      counter={counter}
+      countdownEnd={settings.stream_end_iso || null}
+    />
   );
 }

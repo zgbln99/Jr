@@ -4,8 +4,6 @@ import {
   getAllSettings,
   getLatestCounter,
   getLatestOcrCounter,
-  listGuests,
-  listMedia,
   listRegions,
 } from "@/lib/db";
 import { AdminDashboard } from "./AdminDashboard";
@@ -19,8 +17,6 @@ export default async function AdminPage() {
   }
 
   const settings = getAllSettings();
-  const guests = listGuests();
-  const media = listMedia();
   const regions = listRegions();
   const latest = getLatestCounter();
   const latestOcr = getLatestOcrCounter();
@@ -28,8 +24,6 @@ export default async function AdminPage() {
   return (
     <AdminDashboard
       settings={settings}
-      guests={guests}
-      media={media}
       regions={regions}
       latest={latest}
       latestOcr={latestOcr}

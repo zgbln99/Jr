@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 type SearchParams = {
   bg?: string;
   text?: string;
+  accent?: string;
   scale?: string;
   label?: string;
 };
@@ -40,6 +41,12 @@ export default function WidgetPage({
       : searchParams.text === "red"
         ? "red"
         : "white";
+  const accent: "red" | "white" | "none" =
+    searchParams.accent === "white"
+      ? "white"
+      : searchParams.accent === "none"
+        ? "none"
+        : "red";
   const scale = Math.max(
     0.4,
     Math.min(2.5, Number(searchParams.scale) || 1),
@@ -51,6 +58,7 @@ export default function WidgetPage({
       initial={counter}
       bg={bg}
       text={text}
+      accent={accent}
       scale={scale}
       label={label}
     />
