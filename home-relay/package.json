@@ -1,0 +1,14 @@
+{
+  "name": "jrjr-home-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runs on your home PC, grabs a frame from the YouTube live stream every N minutes, POSTs it to the VPS for OCR. Uses your home IP — no proxy required.",
+  "type": "module",
+  "scripts": {
+    "start": "node relay.mjs",
+    "install-browsers": "playwright install chromium chromium-headless-shell"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
