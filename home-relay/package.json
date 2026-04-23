@@ -5,11 +5,9 @@
   "description": "Runs on your home PC, grabs a frame from the YouTube live stream every N minutes, POSTs it to the VPS for OCR. Uses your home IP — no proxy required.",
   "type": "module",
   "scripts": {
-    "start": "node relay.mjs",
-    "install-browsers": "playwright install chromium chromium-headless-shell"
+    "start": "node relay.mjs"
   },
   "dependencies": {
-    "ffmpeg-static": "^5.2.0",
-    "playwright": "^1.49.0"
+    "ffmpeg-static": "^5.2.0"
   }
 }

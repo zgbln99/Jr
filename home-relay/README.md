@@ -1,142 +1,102 @@
 # jrjr.pl — home relay
 
-Mały klient, który ma chodzić na Twoim komputerze domowym przez czas
-streamu. Co 5 minut otwiera headless Chromium na YouTube, robi
-screenshot widgetu i wysyła PNG na VPS — tam jest OCR i aktualizacja
-licznika.
-
-**Po co to istnieje:** VPS-y (OVH, Hetzner, wszyscy) mają IP flagowane
-przez Google — YouTube odmawia serwowania playera. Twój komputer
-domowy ma zwykły, konsumencki IP, który nie ma tego problemu. Zero
-proxy, zero kosztów.
+Mały klient, który chodzi na Twoim komputerze domowym. Co X minut pobiera
+klatkę ze streamu YouTube przez `yt-dlp + ffmpeg` i wysyła ją na VPS,
+gdzie jest OCR licznika. Twój PC ma zwykłe domowe IP, więc YouTube
+serwuje stream bez problemów — żadnego proxy, żadnych cookies
+z loginem.
 
 ## Wymagania
 
-- Dowolny komputer na Windows / macOS / Linux, który ma internet i
-  może chodzić przez 9 dni streamu.
-- Node.js 20+ (<https://nodejs.org> → pobierz LTS).
-- ~500 MB miejsca na dysku (Chromium via Playwright waży ~250 MB + wheel
-  Playwrighta).
-- ~10 MB internetu na godzinę (1 screenshot / 5 min × 12 = 72 MB/day).
+- Dowolny komputer na Windows / macOS / Linux, który ma internet.
+- Node.js 20+ (<https://nodejs.org>, LTS).
+- ~60 MB miejsca na dysku (ffmpeg-static + yt-dlp).
+- ~5 MB internetu / tick (tick co 5 min → ~1.5 GB / 9 dni).
 
-## Pierwsza instalacja — Windows
+## Instalacja (Windows)
 
-1. **Zainstaluj Node.js** z <https://nodejs.org>. Wybierz LTS. Po
-   instalacji zrestartuj PC (żeby `node` był widoczny wszędzie w PATH).
-2. Pobierz / skopiuj ten folder `home-relay/` na swój komputer.
-   Możesz go mieć np. w `C:\jrjr-relay\`.
-3. Otwórz **PowerShell** w tym folderze (Shift+prawy klik na pustym
-   miejscu → „Otwórz w terminalu" / „Open PowerShell here").
-4. Zainstaluj zależności:
+1. Zainstaluj Node.js LTS ze strony <https://nodejs.org>, potem
+   zrestartuj PC żeby `node` trafił do PATH.
+2. Skopiuj folder `home-relay/` na swój PC (np. `C:\jrjr-relay\`).
+3. PowerShell → Shift+prawy klik na folderze → „Otwórz PowerShell tutaj":
    ```powershell
+   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
    npm install
-   npm run install-browsers
-   ```
-   Pierwsze `install-browsers` ściąga Chromium (~250 MB, 1–2 min).
-5. Skopiuj plik konfiguracji:
-   ```powershell
    copy .env.example .env
    notepad .env
    ```
-6. W Notatniku uzupełnij **dwa pola**:
-   - `VPS_URL` — pełny URL Twojego VPS-a, np. `http://51.75.65.32:8010`
-     (albo `https://jrjr.pl` po wdrożeniu certbota).
-   - `SESSION_SECRET` — musi być **dokładnie taki sam** jak na VPS w
-     `/var/www/jrjr/.env`. Skopiuj 1:1. Bez tego VPS nie przyjmie
-     uploadów (odpowie 401).
+4. W Notatniku uzupełnij:
+   - `VPS_URL=http://51.75.65.32:8010` (lub `https://jrjr.pl` po certbocie)
+   - `SESSION_SECRET=` wklej 1:1 to co masz w `/var/www/jrjr/.env` na VPS
+   - Resztę zostaw
 
-   Resztę zostaw bez zmian. Zapisz (Ctrl+S), zamknij.
+   Zapisz (Ctrl+S), zamknij.
 
-## Pierwsza instalacja — macOS / Linux
+## Uruchamianie
 
-Identycznie, tylko zamiast PowerShella terminal, zamiast `copy` — `cp`.
+Podwójny klik na `start.cmd`, albo w PowerShellu:
+
+```powershell
+node relay.mjs
+```
+
+Przy pierwszym uruchomieniu relay pobiera `yt-dlp.exe` z GitHuba
+(~10 MB, jedyny raz) i zapisuje obok `relay.mjs`. Windows Defender
+może wyświetlić ostrzeżenie — „Uruchom mimo to", bo to zaufany binarka
+z oficjalnego releasu yt-dlp.
+
+Po zainicjowaniu:
+
+```
+[relay] starting · VPS=http://... · stream=... · interval=300s
+[relay] resolving stream URL via yt-dlp ...
+[relay] got URL in 2140ms, valid for ~118 min
+[relay] 16:10:03  ff=1820ms up=320ms  6139722.46 PLN
+[relay]   region 1 (tipply): 947253
+[relay]   region 2 (siepomaga): 6139722.46
+```
+
+Każdy kolejny tick to tylko `ffmpeg → upload`, ~2 sekundy. Co ~30 min
+(lub gdy URL wygaśnie wcześniej) relay pyta yt-dlp o świeży URL.
+
+## Autostart z Windows
+
+1. `Win + R` → `shell:startup` → Enter
+2. Otworzy się folder autostartu
+3. Przeciągnij do niego **skrót** (prawy klik → „Utwórz skrót") na `start.cmd`
+
+Od teraz relay startuje automatycznie po włączeniu PC-ta.
+
+## macOS / Linux
+
+Analogicznie, tylko zamiast `copy` → `cp`, zamiast `notepad` → `nano`:
 
 ```bash
 cd ~/jrjr-relay
 npm install
-npm run install-browsers
 cp .env.example .env
-nano .env    # uzupełnij VPS_URL i SESSION_SECRET
+nano .env
+node relay.mjs
 ```
 
-## Uruchamianie
-
-**Windows:**
-
-Podwójny klik na `start.cmd`. Otworzy się okienko konsoli i co 5 minut
-wypisze linię typu:
-
-```
-[relay] 2026-04-23T15:05:10.123Z  grab=5421ms upload=310ms  sum=6098600.29 PLN
-[relay]   region 1 (tipply): 247454
-[relay]   region 2 (siepomaga): 5851146.29
-```
-
-Jak chcesz zamknąć — Ctrl+C albo X okna. Nie zatrzymuje streamu, tylko
-licznik przestaje się aktualizować (pokaże ostatnią znaną kwotę).
-
-**macOS / Linux:**
-
-```bash
-cd ~/jrjr-relay
-npm start
-```
-
-## Autostart z Windowsem (zalecane na czas streamu)
-
-Żebyś nie musiał uruchamiać ręcznie po każdym włączeniu komputera:
-
-1. Naciśnij `Win + R`, wpisz `shell:startup`, Enter.
-2. Otworzy się folder autostartu.
-3. Przeciągnij do niego **skrót** (prawy klik → „Utwórz skrót") do
-   `start.cmd`. Skrót, nie sam plik.
-4. Po restartu PC relay odpala się samoczynnie.
-
-## Kalibracja
-
-Zanim relay zacznie liczyć, wejdź na stronie VPS-a w
-`/admin → Kalibracja OCR`, kliknij „Pobierz świeżą klatkę" (to odpala
-również relay-owe klatki, bo VPS zapisuje każdy upload jako
-`last-frame.jpg`), narysuj prostokąty nad kwotami na widgecie, zapisz.
-
-Dopóki nie ma żadnego prostokąta, relay uploaduje klatki (możesz je
-obejrzeć w kalibratorze), ale OCR nie policzy kwoty. Po pierwszym
-prostokącie — wszystko działa.
+Relay ściąga `yt-dlp` (Linux) albo `yt-dlp_macos` (macOS) automatycznie.
 
 ## Troubleshooting
 
-### „401 Unauthorized" w logach
-
-`SESSION_SECRET` w `.env` relay-a nie zgadza się z tym na VPS-ie. Wklej
-od nowa, zwróć uwagę na spacje / newline.
-
-### „Connection refused" / „ETIMEDOUT"
-
-VPS_URL źle wpisany albo VPS wyłączony / nie słucha na porcie 8010.
-Sprawdź `curl -I http://51.75.65.32:8010/api/counter` z Twojego
-komputera — powinno wrócić 200.
-
-### „playwright: Executable doesn't exist"
-
-Chromium się nie ściągnął. W folderze uruchom:
-
-```
-npm run install-browsers
-```
-
-### Okienko zamyka się od razu po dwu-kliku na `start.cmd`
-
-Brakuje `.env` albo `node_modules`. Otwórz PowerShell, wejdź w folder,
-uruchom tam, zobaczysz prawdziwy komunikat błędu.
-
-### Chcę zmienić interwał
-
-Edytuj `.env` → `INTERVAL_MINUTES`. Restart relay-a (zamknij + uruchom).
+- **`401 Unauthorized`** — `SESSION_SECRET` w `.env` nie zgadza się z
+  VPS-em. Skopiuj dokładnie, łącznie z tym co po `=`.
+- **`yt-dlp timeout` / `No video formats`** — yt-dlp czasem wymaga
+  aktualizacji pod YouTube'owe zmiany. Usuń `yt-dlp.exe` z folderu,
+  uruchom `node relay.mjs` — ściągnie najnowszą wersję.
+- **`ECONNREFUSED` / `ETIMEDOUT`** — VPS wyłączony albo `VPS_URL` źle.
+  Test z PC: `curl -I http://51.75.65.32:8010/api/counter` → 200.
+- **Chcę dłuższe/krótsze odstępy** — `INTERVAL_MINUTES=5` (domyślnie) w
+  `.env`, albo `INTERVAL_SECONDS=10` dla sub-minutowego cadence.
 
 ## Bezpieczeństwo
 
-- Plik `.env` trzyma `SESSION_SECRET` — nie commituj nigdzie, nie
-  wrzucaj na Dysk Google, nie wysyłaj znajomym.
-- Relay nie zbiera żadnych Twoich danych. Tylko odpala Chromium,
-  screenshotuje YouTube, wysyła obrazek na VPS. Żadnego telemetrycznego
-  pingu, żadnego analytics.
+- `.env` trzyma `SESSION_SECRET` — nie commituj nigdzie, nie wrzucaj
+  na Dysk Google, nie wysyłaj znajomym.
+- Relay nie zbiera żadnych Twoich danych. Tylko `yt-dlp` pyta YouTube
+  o URL, `ffmpeg` pobiera klatkę, fetch wysyła JPEG na Twój VPS.
+- `yt-dlp.exe` jest pobierany z oficjalnego releasu <https://github.com/yt-dlp/yt-dlp/releases/latest>.
