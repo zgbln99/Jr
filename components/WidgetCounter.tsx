@@ -13,9 +13,17 @@ type WidgetProps = {
   bg: "transparent" | "dark" | "chroma";
   text: "white" | "charcoal" | "red";
   accent: "red" | "white" | "none";
+  shadow: "none" | "soft" | "strong";
   scale: number;
   label: boolean;
 };
+
+const SHADOWS = {
+  none: "none",
+  soft: "0 2px 10px rgba(0,0,0,0.45), 0 0 2px rgba(0,0,0,0.7)",
+  strong:
+    "0 6px 28px rgba(0,0,0,0.75), 0 2px 6px rgba(0,0,0,0.55), 0 0 3px rgba(0,0,0,0.9)",
+} as const;
 
 function splitAmount(n: number): { number: string; currency: string } {
   const full = new Intl.NumberFormat("pl-PL", {
@@ -36,6 +44,7 @@ export function WidgetCounter({
   bg,
   text,
   accent,
+  shadow,
   scale,
   label,
 }: WidgetProps) {
@@ -103,15 +112,17 @@ export function WidgetCounter({
 
   const { number, currency } = splitAmount(Math.round(displayed));
 
-  // Drop shadow on transparent background so the number reads over any
-  // overlay the streamer lays beneath it.
-  const numberShadow =
-    bg === "transparent"
-      ? "0 4px 16px rgba(0,0,0,0.55), 0 0 2px rgba(0,0,0,0.85)"
-      : "none";
+  // Drop shadow keeps the number readable over busy overlays. Applied by
+  // default even in dark/chroma modes so moving the widget between
+  // backgrounds doesn't look inconsistent. Override via ?shadow=none or
+  // ?shadow=soft when the streamer's design already has enough contrast.
+  const numberShadow = SHADOWS[shadow];
+  // Label gets a softer variant so the dot + eyebrow don't compete with
+  // the main number visually.
+  const labelShadow = shadow === "none" ? "none" : SHADOWS.soft;
 
   const pulseShadow = pulse
-    ? `0 0 50px ${accentColor === "#e60000" ? "rgba(230,0,0,0.6)" : "rgba(255,255,255,0.4)"}`
+    ? `0 0 60px ${accentColor === "#e60000" ? "rgba(230,0,0,0.7)" : "rgba(255,255,255,0.5)"}`
     : "";
 
   return (
@@ -147,7 +158,7 @@ export function WidgetCounter({
                   color: textColor,
                   opacity: 0.85,
                   fontSize: `${0.82 * scale}rem`,
-                  textShadow: numberShadow,
+                  textShadow: labelShadow,
                 }}
               >
                 Zebrano dotychczas

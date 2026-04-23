@@ -13,6 +13,7 @@ type SearchParams = {
   bg?: string;
   text?: string;
   accent?: string;
+  shadow?: string;
   scale?: string;
   label?: string;
 };
@@ -47,6 +48,12 @@ export default function WidgetPage({
       : searchParams.accent === "none"
         ? "none"
         : "red";
+  const shadow: "none" | "soft" | "strong" =
+    searchParams.shadow === "none"
+      ? "none"
+      : searchParams.shadow === "soft"
+        ? "soft"
+        : "strong";
   const scale = Math.max(
     0.4,
     Math.min(2.5, Number(searchParams.scale) || 1),
@@ -59,6 +66,7 @@ export default function WidgetPage({
       bg={bg}
       text={text}
       accent={accent}
+      shadow={shadow}
       scale={scale}
       label={label}
     />
